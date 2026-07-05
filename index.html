@@ -257,12 +257,14 @@ layout: none
       text-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
     .play-toolbar {
+      position: relative;
       display: flex; justify-content: center; align-items: center;
       gap: 1.5vw; padding-top: 0.8vh; flex-shrink: 0;
     }
     .play-toolbar button {
       background: transparent; border: 1px solid var(--border);
       color: var(--muted); font-size: clamp(1.3rem, 3vw, 2.2rem);
+      font-weight: 700;
       min-height: clamp(3.5rem, 9vh, 6.5rem);
       padding: 0.5vh 3vw; border-radius: 999px;
       display: inline-flex; align-items: center; justify-content: center;
@@ -275,6 +277,14 @@ layout: none
       background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);
       border-radius: 20px; padding: 0.25em 0.9em; margin-bottom: 0.5vh;
       display: inline-block;
+    }
+    .play-timer {
+      position: absolute; right: 1.5vw; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 999px; padding: 0.4em 1.1em;
+      font-size: clamp(1.2rem, 2.6vw, 1.9rem); font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
     }
 
 
@@ -525,7 +535,21 @@ function freshState() {
     breakTeam: null,
     adHoc: [],
     queue: [],
+    gameStartedAt: null,
+    gameEndedAt: null,
   };
+}
+
+// ── GAME TIMER ──────────────────────────────────────────────────────────────
+function formatElapsed(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function currentElapsedMs() {
+  if (!S.gameStartedAt) return 0;
+  return (S.gameEndedAt || Date.now()) - S.gameStartedAt;
 }
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
@@ -570,6 +594,8 @@ function D(action, a, b) {
       S.gamesPlayed = 0;
       S.breakTeam = null;
       S.queue = [];
+      S.gameStartedAt = Date.now();
+      S.gameEndedAt = null;
       T.forEach(t => { t.wins = 0; t.shooterIdx = 0; });
       S.view = 'game';
       playMode = true;
@@ -584,6 +610,7 @@ function D(action, a, b) {
           T[i].shooterIdx = T[i].shooterIdx ^ 1;
       });
       S.lastWinner = a;
+      S.gameEndedAt = Date.now();
       // loser goes to back of queue if queue exists
       if (S.queue.length > 0)
         S.queue.push({ players: [...T[other].players] });
@@ -597,6 +624,8 @@ function D(action, a, b) {
       S.breakTeam = winner;
       S.extras = GAME_TYPES[S.gameType].initExtras();
       if (prevTarget !== undefined) S.extras.target = prevTarget;
+      S.gameStartedAt = Date.now();
+      S.gameEndedAt = null;
       playMode = true;
       break;
     }
@@ -614,6 +643,8 @@ function D(action, a, b) {
       S.breakTeam = winner;
       S.extras = GAME_TYPES[S.gameType].initExtras();
       if (prevTarget !== undefined) S.extras.target = prevTarget;
+      S.gameStartedAt = Date.now();
+      S.gameEndedAt = null;
       playMode = true;
       break;
     }
@@ -657,6 +688,8 @@ function D(action, a, b) {
     case 'newGame':
       S.extras = GAME_TYPES[S.gameType].initExtras();
       S.breakTeam = null;
+      S.gameStartedAt = Date.now();
+      S.gameEndedAt = null;
       S.view = 'game';
       break;
 
@@ -886,6 +919,7 @@ function render() {
           <button onclick="D('coinFlip')"><img src="./assets/images/billiards/coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
           <button onclick="showQueueModal()">👥 Up Next</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
+          <div class="play-timer" id="game-timer">${formatElapsed(currentElapsedMs())}</div>
         </div>
       </div>`;
     return;
@@ -1024,6 +1058,13 @@ window.D = D;
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { queuePending = []; closeModal(); }
 });
+
+// Ticks the Play Mode game clock without re-rendering the rest of the page.
+setInterval(() => {
+  if (!playMode || S.view !== 'game' || !S.gameStartedAt || S.gameEndedAt) return;
+  const timerEl = document.getElementById('game-timer');
+  if (timerEl) timerEl.textContent = formatElapsed(currentElapsedMs());
+}, 1000);
 
 render();
 </script>
