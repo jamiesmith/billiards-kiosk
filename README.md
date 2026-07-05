@@ -49,6 +49,16 @@ players:
 
 Add or remove names as needed — each one becomes a selectable player on the setup screen. Anyone not in the file can still be added on the fly as a one-off ("ad hoc") player from the kiosk itself, so the YAML file only needs your regulars.
 
+### Overriding the roster without editing the YAML
+
+You can also swap in a roster for a single page load with a `?players=` query string, no rebuild required:
+
+```
+https://billiards.grandelatte.com/?players=Alice,Bob,Chris,Dana
+```
+
+Names are comma-separated; use `+` or `%20` for spaces in a name (e.g. `?players=Jamie+Smith,Amy,Bob`). This is handy for letting someone try the kiosk with their own group's names without forking the repo — it only affects that one page load and falls back to `_data/billiards.yml` when the parameter is omitted.
+
 A few other things worth updating if you fork this:
 
 - [_config.yml](_config.yml) — `title`, `description`, and `url` (the `url` matters if you deploy to GitHub Pages).

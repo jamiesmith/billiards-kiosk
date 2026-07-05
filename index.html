@@ -37,7 +37,7 @@ layout: none
     }
 
     #app {
-      max-width: 860px;
+      max-width: 1400px;
       margin: 0 auto;
       padding: 1rem 1rem 3rem;
     }
@@ -339,8 +339,15 @@ layout: none
 <div id="modal-root"></div>
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-// Player roster comes from _data/billiards.yml
-const BASE_PLAYERS = {{ site.data.billiards.players | jsonify }};
+// Player roster comes from _data/billiards.yml, unless overridden per-load
+// with ?players=Alice,Bob,Chris (comma-separated names, no YAML edit needed).
+const DEFAULT_PLAYERS = {{ site.data.billiards.players | jsonify }};
+const BASE_PLAYERS = (() => {
+  const raw = new URLSearchParams(location.search).get('players');
+  if (!raw) return DEFAULT_PLAYERS;
+  const names = raw.split(',').map(n => n.trim()).filter(Boolean);
+  return names.length ? names : DEFAULT_PLAYERS;
+})();
 
 // ── GAME TYPE REGISTRY ──────────────────────────────────────────────────────
 // To add a new game, add an entry here with id, name, initExtras, renderExtras.
