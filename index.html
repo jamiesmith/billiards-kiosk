@@ -256,22 +256,24 @@ layout: none
       border-radius: 999px;
       text-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
-    .play-exit {
+    .play-toolbar {
       display: flex; justify-content: center; align-items: center;
-      gap: 0.75rem; padding-top: 0.8vh; flex-shrink: 0;
+      gap: 1.5vw; padding-top: 0.8vh; flex-shrink: 0;
     }
-    .play-exit button {
+    .play-toolbar button {
       background: transparent; border: 1px solid var(--border);
-      color: var(--muted); font-size: 0.9rem; min-height: 36px;
-      padding: 0.3rem 1.2rem; border-radius: 20px;
+      color: var(--muted); font-size: clamp(1.3rem, 3vw, 2.2rem);
+      min-height: clamp(3.5rem, 9vh, 6.5rem);
+      padding: 0.5vh 3vw; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center;
       opacity: 0.7;
     }
-    .play-exit button:hover { opacity: 1; }
+    .play-toolbar button:hover { opacity: 1; }
     .break-badge {
-      font-size: clamp(0.65rem, 1.4vw, 1.1rem);
+      font-size: clamp(1.1rem, 2.6vw, 2rem);
       font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
       background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);
-      border-radius: 20px; padding: 0.2em 0.75em; margin-bottom: 0.5vh;
+      border-radius: 20px; padding: 0.25em 0.9em; margin-bottom: 0.5vh;
       display: inline-block;
     }
 
@@ -567,6 +569,7 @@ function D(action, a, b) {
       S.extras = GAME_TYPES[S.gameType].initExtras();
       S.gamesPlayed = 0;
       S.breakTeam = null;
+      S.queue = [];
       T.forEach(t => { t.wins = 0; t.shooterIdx = 0; });
       S.view = 'game';
       playMode = true;
@@ -589,8 +592,9 @@ function D(action, a, b) {
 
     case 'playAgain': {
       const prevTarget = S.extras.target;
+      const winner = S.lastWinner;
       S.lastWinner = null;
-      S.breakTeam = null;
+      S.breakTeam = winner;
       S.extras = GAME_TYPES[S.gameType].initExtras();
       if (prevTarget !== undefined) S.extras.target = prevTarget;
       playMode = true;
@@ -599,14 +603,15 @@ function D(action, a, b) {
 
     case 'playNext': {
       if (S.queue.length === 0) break;
-      const loser = S.lastWinner ^ 1;
+      const winner = S.lastWinner;
+      const loser = winner ^ 1;
       const next = S.queue.shift();
       T[loser].players = next.players;
       T[loser].shooterIdx = 0;
       T[loser].wins = 0;
       const prevTarget = S.extras.target;
       S.lastWinner = null;
-      S.breakTeam = null;
+      S.breakTeam = winner;
       S.extras = GAME_TYPES[S.gameType].initExtras();
       if (prevTarget !== undefined) S.extras.target = prevTarget;
       playMode = true;
@@ -645,7 +650,7 @@ function D(action, a, b) {
     case 'togglePlay': playMode = !playMode; break;
 
     case 'endSession': S.view = 'summary'; break;
-    case 'goHome': playMode = false; S.view = 'setup'; break;
+    case 'goHome': playMode = false; S.view = 'setup'; S.lastWinner = null; break;
 
     case 'coinFlip': { const b = new Uint8Array(1); crypto.getRandomValues(b); S.breakTeam = b[0] & 1; break; }
 
@@ -877,7 +882,7 @@ function render() {
         <button class="play-close" onclick="modal('End this game and return to setup?',()=>D('goHome'))">✕</button>
         <div class="play-cards">${cardA}${cardB}</div>
         ${nextUp}
-        <div class="play-exit">
+        <div class="play-toolbar">
           <button onclick="D('coinFlip')"><img src="./assets/images/billiards/coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
           <button onclick="showQueueModal()">👥 Up Next</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
