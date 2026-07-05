@@ -285,6 +285,7 @@ layout: none
       font-size: clamp(1.2rem, 2.6vw, 1.9rem); font-weight: 700;
       font-variant-numeric: tabular-nums;
       color: var(--text);
+      cursor: pointer; user-select: none;
     }
 
 
@@ -768,7 +769,7 @@ function viewSetup() {
 <button class="btn-primary btn-lg" onclick="D('start')" ${canStart ? '' : 'disabled'}>
       Start Game →
     </button>
-    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon</p>`;
+    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon &nbsp;·&nbsp; <a href="?debug" style="color:inherit;text-decoration:none">debug</a></p>`;
 }
 
 // ── GAME VIEW ───────────────────────────────────────────────────────────────
@@ -919,7 +920,7 @@ function render() {
           <button onclick="D('coinFlip')"><img src="./assets/images/billiards/coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
           <button onclick="showQueueModal()">👥 Up Next</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
-          <div class="play-timer" id="game-timer">${formatElapsed(currentElapsedMs())}</div>
+          <div class="play-timer" id="game-timer" data-timer-visible="false" onclick="toggleGameTimer()">⌚</div>
         </div>
       </div>`;
     return;
@@ -1059,11 +1060,21 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { queuePending = []; closeModal(); }
 });
 
+function toggleGameTimer() {
+  const el = document.getElementById('game-timer');
+  if (!el) return;
+  const showing = el.dataset.timerVisible === 'true';
+  el.dataset.timerVisible = showing ? 'false' : 'true';
+  el.textContent = showing ? '⌚' : formatElapsed(currentElapsedMs());
+}
+
 // Ticks the Play Mode game clock without re-rendering the rest of the page.
 setInterval(() => {
   if (!playMode || S.view !== 'game' || !S.gameStartedAt || S.gameEndedAt) return;
   const timerEl = document.getElementById('game-timer');
-  if (timerEl) timerEl.textContent = formatElapsed(currentElapsedMs());
+  if (timerEl && timerEl.dataset.timerVisible === 'true') {
+    timerEl.textContent = formatElapsed(currentElapsedMs());
+  }
 }, 1000);
 
 render();
