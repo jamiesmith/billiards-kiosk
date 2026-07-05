@@ -1,0 +1,22 @@
+title: "Pool House Rocks"
+description: "Billiards scorekeeper kiosk"
+url: "https://billiards.jamieandamy.com"
+repository: "jamiesmith/billiards-kiosk"
+
+# No theme — standalone app
+theme: null
+
+# Only process index.html and _data
+include: []
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - LICENSE
+  - README.md
+  - runit.sh
+  - vendor
+
+encoding: "utf-8"
+markdown: kramdown
+permalink: pretty
+timezone: America/New_York
