@@ -348,7 +348,7 @@ const BALL_PX = { lg: 72, sel: 110, score: 90, badge: 56, md: 36, sm: 26 };
 
 function ballImg(file, size) {
   const px = BALL_PX[size] || 36;
-  return `<img src="/assets/images/billiards/${file}" width="${px}" height="${px}"
+  return `<img src="./assets/images/billiards/${file}" width="${px}" height="${px}"
                style="display:inline-block;flex-shrink:0;vertical-align:middle">`;
 }
 
@@ -371,16 +371,16 @@ const GAME_TYPES = {
       if (assigned) {
         const file = isSolids ? 'billiard-ball-5.png' : 'billiard-ball-12.png';
         return `<div class="play-ball" style="margin-bottom:3vh">
-          <img src="/assets/images/billiards/${file}" style="width:${sz};height:${sz};display:block">
+          <img src="./assets/images/billiards/${file}" style="width:${sz};height:${sz};display:block">
         </div>`;
       }
       const pickSz = 'clamp(3.5rem,18vw,18rem)';
       return `<div class="play-ball" style="display:flex;gap:3vw;align-items:center;justify-content:center;margin-bottom:3vh">
         <button onclick="D('setSolids',${teamIdx})" style="background:none;border:none;padding:0;min-height:0;cursor:pointer">
-          <img src="/assets/images/billiards/billiard-ball-5.png" style="width:${pickSz};height:${pickSz};display:block">
+          <img src="./assets/images/billiards/billiard-ball-5.png" style="width:${pickSz};height:${pickSz};display:block">
         </button>
         <button onclick="D('setStripes',${teamIdx})" style="background:none;border:none;padding:0;min-height:0;cursor:pointer">
-          <img src="/assets/images/billiards/billiard-ball-12.png" style="width:${pickSz};height:${pickSz};display:block">
+          <img src="./assets/images/billiards/billiard-ball-12.png" style="width:${pickSz};height:${pickSz};display:block">
         </button>
       </div>`;
     },
@@ -870,7 +870,7 @@ function render() {
         <div class="play-cards">${cardA}${cardB}</div>
         ${nextUp}
         <div class="play-exit">
-          <button onclick="D('coinFlip')"><img src="/assets/images/billiards/coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
+          <button onclick="D('coinFlip')"><img src="./assets/images/billiards/coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
           <button onclick="showQueueModal()">👥 Up Next</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
         </div>
