@@ -354,12 +354,32 @@ layout: none
 // ── CONFIG ──────────────────────────────────────────────────────────────────
 // Player roster comes from _data/billiards.yml, unless overridden per-load
 // with ?players=Alice,Bob,Chris (comma-separated names, no YAML edit needed).
+// ?a=Alice,Bob&b=Charlie pre-fills team A and team B (1-2 names each).
+// ?queue=Dave,Eve,Frank pre-fills the Up Next queue; names already in ?a=/?b=/?players= are skipped.
 const DEFAULT_PLAYERS = {{ site.data.billiards.players | jsonify }};
 const BASE_PLAYERS = (() => {
   const raw = new URLSearchParams(location.search).get('players');
   if (!raw) return DEFAULT_PLAYERS;
   const names = raw.split(',').map(n => n.trim()).filter(Boolean);
   return names.length ? names : DEFAULT_PLAYERS;
+})();
+const TEAM_A_OVERRIDE = (() => {
+  const raw = new URLSearchParams(location.search).get('a');
+  if (!raw) return [];
+  return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 2);
+})();
+const TEAM_B_OVERRIDE = (() => {
+  const raw = new URLSearchParams(location.search).get('b');
+  if (!raw) return [];
+  return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 2);
+})();
+const QUEUE_OVERRIDE = (() => {
+  const raw = new URLSearchParams(location.search).get('queue');
+  if (!raw) return [];
+  const playersParam = new URLSearchParams(location.search).get('players');
+  const explicitPlayers = playersParam ? BASE_PLAYERS : [];
+  const taken = new Set([...explicitPlayers, ...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE]);
+  return raw.split(',').map(n => n.trim()).filter(n => n && !taken.has(n));
 })();
 
 // ── GAME TYPE REGISTRY ──────────────────────────────────────────────────────
@@ -522,6 +542,11 @@ let queuePending = [];
   }
 })();
 
+if (TEAM_A_OVERRIDE.length > 0) S.teams[0].players = [...TEAM_A_OVERRIDE];
+if (TEAM_B_OVERRIDE.length > 0) S.teams[1].players = [...TEAM_B_OVERRIDE];
+if (QUEUE_OVERRIDE.length > 0)
+  QUEUE_OVERRIDE.forEach(name => S.queue.push({ players: [name] }));
+
 function freshState() {
   return {
     view: 'setup',
@@ -538,6 +563,7 @@ function freshState() {
     queue: [],
     gameStartedAt: null,
     gameEndedAt: null,
+    gameHistory: [],
   };
 }
 
@@ -558,6 +584,11 @@ function allPlayers() { return [...BASE_PLAYERS, ...S.adHoc]; }
 function takenSet()   { return new Set([...S.teams[0].players, ...S.teams[1].players]); }
 function teamLabel(i) { return S.teams[i].players.join(' & ') || (i === 0 ? 'Team A' : 'Team B'); }
 function winVerb(i)   { return S.teams[i].players.length > 1 ? 'win' : 'wins'; }
+function putWinnerLeft(winnerIdx) {
+  if (winnerIdx !== 1) return;
+  [S.teams[0], S.teams[1]] = [S.teams[1], S.teams[0]];
+  if (S.breakTeam !== null) S.breakTeam ^= 1;
+}
 
 // HTML-escape for display
 function x(s) {
@@ -594,7 +625,7 @@ function D(action, a, b) {
       S.extras = GAME_TYPES[S.gameType].initExtras();
       S.gamesPlayed = 0;
       S.breakTeam = null;
-      S.queue = [];
+      S.queue = QUEUE_OVERRIDE.map(name => ({ players: [name] }));
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
       T.forEach(t => { t.wins = 0; t.shooterIdx = 0; });
@@ -606,6 +637,7 @@ function D(action, a, b) {
       const other = a ^ 1;
       T[a].wins++;
       S.gamesPlayed++;
+      S.gameHistory.push({ winners: [...T[a].players], losers: [...T[other].players] });
       [a, other].forEach(i => {
         if (T[i].players.length > 1)
           T[i].shooterIdx = T[i].shooterIdx ^ 1;
@@ -627,6 +659,7 @@ function D(action, a, b) {
       if (prevTarget !== undefined) S.extras.target = prevTarget;
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
+      putWinnerLeft(winner);
       playMode = true;
       break;
     }
@@ -646,6 +679,7 @@ function D(action, a, b) {
       if (prevTarget !== undefined) S.extras.target = prevTarget;
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
+      putWinnerLeft(winner);
       playMode = true;
       break;
     }
@@ -827,6 +861,44 @@ function viewSummary() {
       <div class="big-score" style="color:${colors[i]}">${t.wins}–${S.teams[i^1].wins}</div>
     </div>`).join('');
 
+  // Per-player records from game history
+  const playerStats = {};
+  S.gameHistory.forEach(({ winners, losers }) => {
+    winners.forEach(p => {
+      if (!playerStats[p]) playerStats[p] = { w: 0, l: 0 };
+      playerStats[p].w++;
+    });
+    losers.forEach(p => {
+      if (!playerStats[p]) playerStats[p] = { w: 0, l: 0 };
+      playerStats[p].l++;
+    });
+  });
+  const playerRows = Object.entries(playerStats)
+    .sort(([, a], [, b]) => (b.w - b.l) - (a.w - a.l) || b.w - a.w)
+    .map(([name, { w, l }]) => {
+      const pct = w + l > 0 ? Math.round(100 * w / (w + l)) : 0;
+      return `<tr>
+        <td style="padding:0.35rem 0.5rem;font-weight:600">${x(name)}</td>
+        <td style="padding:0.35rem 0.5rem;text-align:center">${w}</td>
+        <td style="padding:0.35rem 0.5rem;text-align:center">${l}</td>
+        <td style="padding:0.35rem 0.5rem;text-align:center;color:var(--muted)">${pct}%</td>
+      </tr>`;
+    }).join('');
+
+  const playerTable = playerRows ? `
+    <div class="card mt-1">
+      <div style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.6rem">Player Records</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">
+          <th style="padding:0.2rem 0.5rem;text-align:left">Player</th>
+          <th style="padding:0.2rem 0.5rem">W</th>
+          <th style="padding:0.2rem 0.5rem">L</th>
+          <th style="padding:0.2rem 0.5rem">Win%</th>
+        </tr></thead>
+        <tbody>${playerRows}</tbody>
+      </table>
+    </div>` : '';
+
   return `
     <h1>Session Over</h1>
     ${winnerIdx !== null
@@ -834,6 +906,7 @@ function viewSummary() {
       : `<p class="big-msg muted">It's a tie!</p>`}
     <div class="grid2 mt-1">${cards}</div>
     <p class="center muted mt-1">${S.gamesPlayed} game${S.gamesPlayed !== 1 ? 's' : ''} · ${x(GAME_TYPES[S.gameType].name)}</p>
+    ${playerTable}
     <div class="action-stack mt-1">
       <button class="btn-primary btn-lg" onclick="D('newGame')">Play Again (same teams)</button>
       <button class="btn-ghost btn-lg" onclick="D('newSession')">New Session</button>
@@ -908,17 +981,16 @@ function render() {
 
   if (playMode && S.view === 'game') {
     const [cardA, cardB] = buildScorecards(true);
-    const nextUp = S.queue.length > 0
-      ? `<div class="play-next-chip">Up next: ${x(S.queue[0].players.join(' & '))}</div>`
-      : '';
+    const upNextLabel = S.queue.length > 0
+      ? `👥 Up Next: ${x(S.queue[0].players.join(' & '))}`
+      : `👥 Up Next`;
     el.innerHTML = `
       <div class="play-overlay">
         <button class="play-close" onclick="modal('End this game and return to setup?',()=>D('goHome'))">✕</button>
         <div class="play-cards">${cardA}${cardB}</div>
-        ${nextUp}
         <div class="play-toolbar">
           <button onclick="D('coinFlip')"><img src="./assets/images/billiards/coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
-          <button onclick="showQueueModal()">👥 Up Next</button>
+          <button onclick="showQueueModal()">${upNextLabel}</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
           <div class="play-timer" id="game-timer" data-timer-visible="false" onclick="toggleGameTimer()">⌚</div>
         </div>
