@@ -592,6 +592,16 @@ function sessionRecord(players) {
   });
   return { w, l };
 }
+function headToHead(playersA, playersB) {
+  let wA = 0, wB = 0;
+  S.gameHistory.forEach(({ winners, losers }) => {
+    const aWon = playersA.some(p => winners.includes(p)) && playersB.some(p => losers.includes(p));
+    const bWon = playersB.some(p => winners.includes(p)) && playersA.some(p => losers.includes(p));
+    if (aWon) wA++;
+    else if (bWon) wB++;
+  });
+  return { wA, wB };
+}
 function putWinnerLeft(winnerIdx) {
   if (winnerIdx !== 1) return;
   [S.teams[0], S.teams[1]] = [S.teams[1], S.teams[0]];
@@ -964,11 +974,15 @@ function buildScorecards(forPlay = false) {
     const badge = gt.teamBadge ? gt.teamBadge(i, S.extras) : '';
     const { w: myW, l: myL } = sessionRecord(t.players);
     const { w: theirW } = sessionRecord(S.teams[other].players);
+    const { wA: h2hW, wB: h2hL } = headToHead(t.players, S.teams[other].players);
     const tallyLabel = myW > theirW ? 'Leads' : myW < theirW ? 'Down' : 'Tied';
     const tallyScore = `${myW}–${myL}`;
+    const h2hHtml = h2hW + h2hL > 0
+      ? `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.2rem">${tallyLabel} · H2H ${h2hW}–${h2hL}</div>`
+      : `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.2rem">${tallyLabel}</div>`;
     const tallyHtml = `<div style="text-align:center;margin-top:0.5rem">
-      <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.55;margin-bottom:0.1rem">${tallyLabel}</div>
       <div class="sc-wins" style="color:${colors[i]}">${tallyScore}</div>
+      ${h2hHtml}
     </div>`;
     return `
       <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
