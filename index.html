@@ -584,6 +584,14 @@ function allPlayers() { return [...BASE_PLAYERS, ...S.adHoc]; }
 function takenSet()   { return new Set([...S.teams[0].players, ...S.teams[1].players]); }
 function teamLabel(i) { return S.teams[i].players.join(' & ') || (i === 0 ? 'Team A' : 'Team B'); }
 function winVerb(i)   { return S.teams[i].players.length > 1 ? 'win' : 'wins'; }
+function sessionRecord(players) {
+  let w = 0, l = 0;
+  S.gameHistory.forEach(({ winners, losers }) => {
+    if (players.some(p => winners.includes(p))) w++;
+    else if (players.some(p => losers.includes(p))) l++;
+  });
+  return { w, l };
+}
 function putWinnerLeft(winnerIdx) {
   if (winnerIdx !== 1) return;
   [S.teams[0], S.teams[1]] = [S.teams[1], S.teams[0]];
@@ -954,9 +962,10 @@ function buildScorecards(forPlay = false) {
     }
 
     const badge = gt.teamBadge ? gt.teamBadge(i, S.extras) : '';
-    const myW = t.wins, theirW = S.teams[other].wins;
+    const { w: myW, l: myL } = sessionRecord(t.players);
+    const { w: theirW } = sessionRecord(S.teams[other].players);
     const tallyLabel = myW > theirW ? 'Leads' : myW < theirW ? 'Down' : 'Tied';
-    const tallyScore = `${myW}–${theirW}`;
+    const tallyScore = `${myW}–${myL}`;
     const tallyHtml = `<div style="text-align:center;margin-top:0.5rem">
       <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.55;margin-bottom:0.1rem">${tallyLabel}</div>
       <div class="sc-wins" style="color:${colors[i]}">${tallyScore}</div>
@@ -964,7 +973,6 @@ function buildScorecards(forPlay = false) {
     return `
       <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
         <div class="sc-name">${x(displayName)}</div>
-        ${S.breakTeam === i && S.extras.solidsTeam == null ? '<div class="break-badge">Break</div>' : ''}
         ${badge ? `<div class="sc-wins-row">${badge}</div>` : ''}
         <div class="sc-players">${players}</div>
         ${t.players.length > 1
