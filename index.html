@@ -376,9 +376,7 @@ const TEAM_B_OVERRIDE = (() => {
 const QUEUE_OVERRIDE = (() => {
   const raw = new URLSearchParams(location.search).get('queue');
   if (!raw) return [];
-  const playersParam = new URLSearchParams(location.search).get('players');
-  const explicitPlayers = playersParam ? BASE_PLAYERS : [];
-  const taken = new Set([...explicitPlayers, ...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE]);
+  const taken = new Set([...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE]);
   return raw.split(',').map(n => n.trim()).filter(n => n && !taken.has(n));
 })();
 
@@ -526,14 +524,11 @@ let playMode = false;
 let queuePending = [];
 
 // ── DEBUG MODE ───────────────────────────────────────────────────────────────
+// Use ?debug with ?a=, ?b=, ?queue=, ?players= to configure state.
+// Add ?go=1 to skip setup and jump straight into the game.
 (function applyDebug() {
   const p = new URLSearchParams(location.search);
   if (!p.has('debug')) return;
-  const all = BASE_PLAYERS.slice();
-  // Pre-fill two players per team from the roster
-  S.teams[0].players = all.slice(0, 2);
-  S.teams[1].players = all.slice(2, 4);
-  // Optional overrides: ?game=nine-ball  ?target=50  ?go=1 (auto-start)
   if (p.get('game') && GAME_TYPES[p.get('game')]) S.gameType = p.get('game');
   if (p.get('go') === '1') {
     S.extras = GAME_TYPES[S.gameType].initExtras();
@@ -602,6 +597,15 @@ function headToHead(playersA, playersB) {
   });
   return { wA, wB };
 }
+function debugUrl() {
+  const hasExplicitPlayers = new URLSearchParams(location.search).has('players');
+  const all = hasExplicitPlayers ? BASE_PLAYERS : BASE_PLAYERS.slice(0, 4);
+  let qs = '?debug&players=' + all.join(',');
+  if (all[0]) qs += '&a=' + all[0];
+  if (all[1]) qs += '&b=' + all[1];
+  if (all.length > 2) qs += '&queue=' + all.slice(2).join(',');
+  return qs;
+}
 function putWinnerLeft(winnerIdx) {
   if (winnerIdx !== 1) return;
   [S.teams[0], S.teams[1]] = [S.teams[1], S.teams[0]];
@@ -643,7 +647,9 @@ function D(action, a, b) {
       S.extras = GAME_TYPES[S.gameType].initExtras();
       S.gamesPlayed = 0;
       S.breakTeam = null;
-      S.queue = QUEUE_OVERRIDE.map(name => ({ players: [name] }));
+      const inGame = new Set([...T[0].players, ...T[1].players]);
+      S.queue = QUEUE_OVERRIDE.map(name => ({ players: [name] }))
+        .filter(e => e.players.every(p => !inGame.has(p)));
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
       T.forEach(t => { t.wins = 0; t.shooterIdx = 0; });
@@ -698,6 +704,29 @@ function D(action, a, b) {
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
       putWinnerLeft(winner);
+      playMode = true;
+      break;
+    }
+
+    // Winner steps aside (still on a hot streak, but wants others to play);
+    // the loser stays at the table to face the next challenger in queue.
+    case 'deferNext': {
+      if (S.queue.length === 0) break;
+      const winner = S.lastWinner;
+      const loser = winner ^ 1;
+      const next = S.queue.shift();
+      S.queue.push({ players: [...T[winner].players] });
+      T[winner].players = next.players;
+      T[winner].shooterIdx = 0;
+      T[winner].wins = 0;
+      const prevTarget = S.extras.target;
+      S.lastWinner = null;
+      S.breakTeam = winner; // the queue challenger, now in the winner's old slot, breaks
+      S.extras = GAME_TYPES[S.gameType].initExtras();
+      if (prevTarget !== undefined) S.extras.target = prevTarget;
+      S.gameStartedAt = Date.now();
+      S.gameEndedAt = null;
+      putWinnerLeft(loser); // the player staying at the table goes on the left
       playMode = true;
       break;
     }
@@ -821,7 +850,7 @@ function viewSetup() {
 <button class="btn-primary btn-lg" onclick="D('start')" ${canStart ? '' : 'disabled'}>
       Start Game →
     </button>
-    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon &nbsp;·&nbsp; <a href="?debug" style="color:inherit;text-decoration:none">debug</a></p>`;
+    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon &nbsp;·&nbsp; <a href="${debugUrl()}" style="color:inherit;text-decoration:none">debug</a></p>`;
 }
 
 // ── GAME VIEW ───────────────────────────────────────────────────────────────
@@ -845,7 +874,10 @@ function viewGame() {
         🏆 ${x(teamLabel(S.lastWinner))} ${winVerb(S.lastWinner)}!
       </div>
       ${S.queue.length > 0
-        ? `<button class="btn-primary btn-lg" onclick="D('playNext')">▶ Play Next: ${x(S.queue[0].players.join(' & '))}</button>`
+        ? `<button class="btn-primary btn-lg" onclick="D('playNext')">▶ Play Next: ${x(S.queue[0].players.join(' & '))}</button>
+           <button class="btn-primary btn-sm" style="margin-top:0.6rem" onclick="D('deferNext')">
+             ↷ Defer: ${x(teamLabel(S.lastWinner ^ 1))} vs ${x(S.queue[0].players.join(' & '))}
+           </button>`
         : `<button class="btn-primary btn-lg" onclick="D('playAgain')">▶ Play Again</button>`}
     </div>
     ` : `
