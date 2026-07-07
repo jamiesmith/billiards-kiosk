@@ -850,7 +850,7 @@ function viewSetup() {
 <button class="btn-primary btn-lg" onclick="D('start')" ${canStart ? '' : 'disabled'}>
       Start Game →
     </button>
-    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon &nbsp;·&nbsp; <a href="${debugUrl()}" style="color:inherit;text-decoration:none">debug</a></p>`;
+    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon &nbsp;·&nbsp; <a href="${debugUrl()}" style="color:inherit;text-decoration:none">debug</a> &nbsp;·&nbsp; {{ site.time | date: "%Y-%m-%d %H:%M" }} UTC</p>`;
 }
 
 // ── GAME VIEW ───────────────────────────────────────────────────────────────
