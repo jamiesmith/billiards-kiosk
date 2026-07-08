@@ -7,7 +7,7 @@ layout: none
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="color-scheme" content="dark light">
-  <title>Billiards Scorekeeper</title>
+  <title>{{ site.title }}</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
   <style>
     :root {
@@ -356,25 +356,35 @@ layout: none
 // with ?players=Alice,Bob,Chris (comma-separated names, no YAML edit needed).
 // ?a=Alice,Bob&b=Charlie pre-fills team A and team B (1-2 names each).
 // ?queue=Dave,Eve,Frank pre-fills the Up Next queue; names already in ?a=/?b=/?players= are skipped.
+const QP = {
+  PLAYERS: 'players',
+  TEAM_A: 'a',
+  TEAM_B: 'b',
+  QUEUE: 'queue',
+  DEBUG: 'debug',
+  GO: 'go',
+  GAME: 'game',
+  TARGET: 'target',
+};
 const DEFAULT_PLAYERS = {{ site.data.billiards.players | jsonify }};
 const BASE_PLAYERS = (() => {
-  const raw = new URLSearchParams(location.search).get('players');
+  const raw = new URLSearchParams(location.search).get(QP.PLAYERS);
   if (!raw) return DEFAULT_PLAYERS;
   const names = raw.split(',').map(n => n.trim()).filter(Boolean);
   return names.length ? names : DEFAULT_PLAYERS;
 })();
 const TEAM_A_OVERRIDE = (() => {
-  const raw = new URLSearchParams(location.search).get('a');
+  const raw = new URLSearchParams(location.search).get(QP.TEAM_A);
   if (!raw) return [];
   return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 2);
 })();
 const TEAM_B_OVERRIDE = (() => {
-  const raw = new URLSearchParams(location.search).get('b');
+  const raw = new URLSearchParams(location.search).get(QP.TEAM_B);
   if (!raw) return [];
   return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 2);
 })();
 const QUEUE_OVERRIDE = (() => {
-  const raw = new URLSearchParams(location.search).get('queue');
+  const raw = new URLSearchParams(location.search).get(QP.QUEUE);
   if (!raw) return [];
   const taken = new Set([...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE]);
   return raw.split(',').map(n => n.trim()).filter(n => n && !taken.has(n));
@@ -383,11 +393,14 @@ const QUEUE_OVERRIDE = (() => {
 // ── GAME TYPE REGISTRY ──────────────────────────────────────────────────────
 // To add a new game, add an entry here with id, name, initExtras, renderExtras.
 // ── BALL RENDERERS ──────────────────────────────────────────────────────────
+const ASSETS_DIR = './assets/images/billiards/';
 const BALL_PX = { lg: 72, sel: 110, score: 90, badge: 56, md: 36, sm: 26 };
+const SOLIDS_BALL = {{ site.data.billiards.balls.solids | jsonify }};
+const STRIPES_BALL = {{ site.data.billiards.balls.stripes | jsonify }};
 
 function ballImg(file, size) {
   const px = BALL_PX[size] || 36;
-  return `<img src="./assets/images/billiards/${file}" width="${px}" height="${px}"
+  return `<img src="${ASSETS_DIR}${file}" width="${px}" height="${px}"
                style="display:inline-block;flex-shrink:0;vertical-align:middle">`;
 }
 
@@ -399,7 +412,7 @@ const GAME_TYPES = {
     initExtras: () => ({ solidsTeam: null }),
     teamBadge(teamIdx, ex) {
       if (ex.solidsTeam === null) return '';
-      const file = ex.solidsTeam === teamIdx ? 'billiard-ball-5.png' : 'billiard-ball-12.png';
+      const file = ex.solidsTeam === teamIdx ? SOLIDS_BALL : STRIPES_BALL;
       return ballImg(file, 'score');
     },
     playBallPicker(teamIdx, ex, color) {
@@ -408,18 +421,18 @@ const GAME_TYPES = {
       const isSolids = solidsTeam === teamIdx;
       const sz = 'min(44vw, 58vh)';
       if (assigned) {
-        const file = isSolids ? 'billiard-ball-5.png' : 'billiard-ball-12.png';
+        const file = isSolids ? SOLIDS_BALL : STRIPES_BALL;
         return `<div class="play-ball" style="margin-bottom:3vh">
-          <img src="./assets/images/billiards/${file}" style="width:${sz};height:${sz};display:block">
+          <img src="${ASSETS_DIR}${file}" style="width:${sz};height:${sz};display:block">
         </div>`;
       }
       const pickSz = 'clamp(3.5rem,18vw,18rem)';
       return `<div class="play-ball" style="display:flex;gap:3vw;align-items:center;justify-content:center;margin-bottom:3vh">
         <button onclick="D('setSolids',${teamIdx})" style="background:none;border:none;padding:0;min-height:0;cursor:pointer">
-          <img src="./assets/images/billiards/billiard-ball-5.png" style="width:${pickSz};height:${pickSz};display:block">
+          <img src="${ASSETS_DIR}${SOLIDS_BALL}" style="width:${pickSz};height:${pickSz};display:block">
         </button>
         <button onclick="D('setStripes',${teamIdx})" style="background:none;border:none;padding:0;min-height:0;cursor:pointer">
-          <img src="./assets/images/billiards/billiard-ball-12.png" style="width:${pickSz};height:${pickSz};display:block">
+          <img src="${ASSETS_DIR}${STRIPES_BALL}" style="width:${pickSz};height:${pickSz};display:block">
         </button>
       </div>`;
     },
@@ -434,10 +447,10 @@ const GAME_TYPES = {
             <div class="ss-team">
               <div class="label">${x(teamLabel(i))}</div>
               <button class="ss-btn ${cls(i,'solids')}" onclick="D('setSolids',${i})">
-                ${ballImg('billiard-ball-5.png','sm')} Solids
+                ${ballImg(SOLIDS_BALL,'sm')} Solids
               </button>
               <button class="ss-btn ${cls(i,'stripes')}" onclick="D('setStripes',${i})">
-                ${ballImg('billiard-ball-12.png','sm')} Stripes
+                ${ballImg(STRIPES_BALL,'sm')} Stripes
               </button>
             </div>`).join('')}
         </div>
@@ -528,11 +541,11 @@ let queuePending = [];
 // Add ?go=1 to skip setup and jump straight into the game.
 (function applyDebug() {
   const p = new URLSearchParams(location.search);
-  if (!p.has('debug')) return;
-  if (p.get('game') && GAME_TYPES[p.get('game')]) S.gameType = p.get('game');
-  if (p.get('go') === '1') {
+  if (!p.has(QP.DEBUG)) return;
+  if (p.get(QP.GAME) && GAME_TYPES[p.get(QP.GAME)]) S.gameType = p.get(QP.GAME);
+  if (p.get(QP.GO) === '1') {
     S.extras = GAME_TYPES[S.gameType].initExtras();
-    if (p.get('target')) S.extras.target = +p.get('target');
+    if (p.get(QP.TARGET)) S.extras.target = +p.get(QP.TARGET);
     S.view = 'game';
   }
 })();
@@ -574,6 +587,18 @@ function currentElapsedMs() {
   return (S.gameEndedAt || Date.now()) - S.gameStartedAt;
 }
 
+// ── TEAM COLORS ─────────────────────────────────────────────────────────────
+// Alpha-blended backgrounds are derived from the --a/--b CSS custom properties
+// at load time, so the palette only has to be edited in one place (the :root
+// block up top) instead of also updating hand-copied rgba(...) literals here.
+function hexToRgb(hex) {
+  const n = parseInt(hex.trim().replace('#', ''), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+const rootStyle = getComputedStyle(document.documentElement);
+const TEAM_RGB = [hexToRgb(rootStyle.getPropertyValue('--a')), hexToRgb(rootStyle.getPropertyValue('--b'))];
+function teamAlpha(i, alpha) { return `rgba(${TEAM_RGB[i]},${alpha})`; }
+
 // ── HELPERS ─────────────────────────────────────────────────────────────────
 function allPlayers() { return [...BASE_PLAYERS, ...S.adHoc]; }
 function takenSet()   { return new Set([...S.teams[0].players, ...S.teams[1].players]); }
@@ -598,18 +623,23 @@ function headToHead(playersA, playersB) {
   return { wA, wB };
 }
 function debugUrl() {
-  const hasExplicitPlayers = new URLSearchParams(location.search).has('players');
+  const hasExplicitPlayers = new URLSearchParams(location.search).has(QP.PLAYERS);
   const all = hasExplicitPlayers ? BASE_PLAYERS : BASE_PLAYERS.slice(0, 4);
-  let qs = '?debug&players=' + all.join(',');
-  if (all[0]) qs += '&a=' + all[0];
-  if (all[1]) qs += '&b=' + all[1];
-  if (all.length > 2) qs += '&queue=' + all.slice(2).join(',');
+  let qs = `?${QP.DEBUG}&${QP.PLAYERS}=` + all.join(',');
+  if (all[0]) qs += `&${QP.TEAM_A}=` + all[0];
+  if (all[1]) qs += `&${QP.TEAM_B}=` + all[1];
+  if (all.length > 2) qs += `&${QP.QUEUE}=` + all.slice(2).join(',');
   return qs;
 }
 function putWinnerLeft(winnerIdx) {
   if (winnerIdx !== 1) return;
   [S.teams[0], S.teams[1]] = [S.teams[1], S.teams[0]];
   if (S.breakTeam !== null) S.breakTeam ^= 1;
+}
+// Strips any queue entry containing one of these names, so someone being
+// seated at the table can't also be left sitting in the queue elsewhere.
+function dequeuePlayers(names) {
+  S.queue = S.queue.filter(e => !e.players.some(p => names.includes(p)));
 }
 
 // HTML-escape for display
@@ -668,9 +698,6 @@ function D(action, a, b) {
       });
       S.lastWinner = a;
       S.gameEndedAt = Date.now();
-      // loser goes to back of queue if queue exists
-      if (S.queue.length > 0)
-        S.queue.push({ players: [...T[other].players] });
       break;
     }
 
@@ -693,6 +720,8 @@ function D(action, a, b) {
       const winner = S.lastWinner;
       const loser = winner ^ 1;
       const next = S.queue.shift();
+      dequeuePlayers(next.players);
+      S.queue.push({ players: [...T[loser].players] }); // outgoing player rejoins the back of the line
       T[loser].players = next.players;
       T[loser].shooterIdx = 0;
       T[loser].wins = 0;
@@ -715,6 +744,7 @@ function D(action, a, b) {
       const winner = S.lastWinner;
       const loser = winner ^ 1;
       const next = S.queue.shift();
+      dequeuePlayers(next.players);
       S.queue.push({ players: [...T[winner].players] });
       T[winner].players = next.players;
       T[winner].shooterIdx = 0;
@@ -903,7 +933,7 @@ function viewSummary() {
   const [a, b] = S.teams;
   const winnerIdx = a.wins > b.wins ? 0 : b.wins > a.wins ? 1 : null;
   const colors  = ['var(--a)', 'var(--b)'];
-  const bgAlpha = ['rgba(90,143,212,0.2)', 'rgba(212,147,90,0.2)'];
+  const bgAlpha = [teamAlpha(0, 0.2), teamAlpha(1, 0.2)];
 
   const cards = S.teams.map((t, i) => `
     <div class="summary-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
@@ -965,14 +995,14 @@ function viewSummary() {
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
 const BANNER = `<div style="text-align:center;margin-bottom:1.25rem">
-  <div style="font-size:1.3rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.35rem">🎱 Pool House Rocks · Billiards</div>
+  <div style="font-size:1.3rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.35rem">🎱 {{ site.title }} · Billiards</div>
   <div style="height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent)"></div>
 </div>`;
 
 function buildScorecards(forPlay = false) {
   const gt = GAME_TYPES[S.gameType];
   const colors  = ['var(--a)', 'var(--b)'];
-  const bgAlpha = ['rgba(90,143,212,0.15)', 'rgba(212,147,90,0.15)'];
+  const bgAlpha = [teamAlpha(0, 0.15), teamAlpha(1, 0.15)];
   return S.teams.map((t, i) => {
     const other = i ^ 1;
     const players = t.players.length
@@ -1043,7 +1073,7 @@ function render() {
         <button class="play-close" onclick="modal('End this game and return to setup?',()=>D('goHome'))">✕</button>
         <div class="play-cards">${cardA}${cardB}</div>
         <div class="play-toolbar">
-          <button onclick="D('coinFlip')"><img src="./assets/images/billiards/coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
+          <button onclick="D('coinFlip')"><img src="${ASSETS_DIR}coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
           <button onclick="showQueueModal()">${upNextLabel}</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
           <div class="play-timer" id="game-timer" data-timer-visible="false" onclick="toggleGameTimer()">⌚</div>

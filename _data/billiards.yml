@@ -12,3 +12,9 @@ players:
   - Phoebe
 #  - Emily
 #  - Kyle
+
+# Ball icons used to mark solids/stripes in 8-Ball. Filenames are looked up in
+# assets/images/billiards/ — swap these to use different numbered balls.
+balls:
+  solids: billiard-ball-5.png
+  stripes: billiard-ball-12.png

@@ -8,3 +8,4 @@ vendor/
 
 # Local Claude Code dev-server config
 .claude/
+cc
