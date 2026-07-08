@@ -397,6 +397,10 @@ const ASSETS_DIR = './assets/images/billiards/';
 const BALL_PX = { lg: 72, sel: 110, score: 90, badge: 56, md: 36, sm: 26 };
 const SOLIDS_BALL = {{ site.data.billiards.balls.solids | jsonify }};
 const STRIPES_BALL = {{ site.data.billiards.balls.stripes | jsonify }};
+const EIGHT_BALL = {{ site.data.billiards.balls.eight_ball | jsonify }};
+const NINE_BALL = {{ site.data.billiards.balls.nine_ball | jsonify }};
+const TEN_BALL = {{ site.data.billiards.balls.ten_ball | jsonify }};
+const STRAIGHT_POOL_BALL = {{ site.data.billiards.balls.straight_pool | jsonify }};
 
 function ballImg(file, size) {
   const px = BALL_PX[size] || 36;
@@ -408,7 +412,7 @@ const GAME_TYPES = {
   'eight-ball': {
     id: 'eight-ball',
     name: '8-Ball',
-    ballHtml: (size='lg') => ballImg('billiard-ball-8.png', size),
+    ballHtml: (size='lg') => ballImg(EIGHT_BALL, size),
     initExtras: () => ({ solidsTeam: null }),
     teamBadge(teamIdx, ex) {
       if (ex.solidsTeam === null) return '';
@@ -460,21 +464,21 @@ const GAME_TYPES = {
 
   'nine-ball': {
     id: 'nine-ball', name: '9-Ball',
-    ballHtml: (size='lg') => ballImg('billiard-ball-9.png', size),
+    ballHtml: (size='lg') => ballImg(NINE_BALL, size),
     initExtras: () => ({}),
     renderExtras: () => '',
   },
 
   'ten-ball': {
     id: 'ten-ball', name: '10-Ball',
-    ballHtml: (size='lg') => ballImg('billiard-ball-10.png', size),
+    ballHtml: (size='lg') => ballImg(TEN_BALL, size),
     initExtras: () => ({}),
     renderExtras: () => '',
   },
 
   'straight-pool': {
     id: 'straight-pool', name: 'Straight Pool',
-    ballHtml: (size='lg') => ballImg('billiard-straight-pool.png', size),
+    ballHtml: (size='lg') => ballImg(STRAIGHT_POOL_BALL, size),
     initExtras: () => ({ scores: [0, 0], target: 100 }),
     playExtras(teamIdx, ex, color) {
       const score = ex.scores[teamIdx];
@@ -1021,7 +1025,8 @@ function buildScorecards(forPlay = false) {
       const ballHtml = gt.playBallPicker
         ? gt.playBallPicker(i, S.extras, colors[i])
         : (gt.teamBadge && gt.teamBadge(i, S.extras))
-          ? `<div class="play-ball">${gt.teamBadge(i, S.extras)}</div>` : '';
+          ? `<div class="play-ball">${gt.teamBadge(i, S.extras)}</div>`
+          : `<div class="play-ball">${gt.ballHtml('score')}</div>`;
       const playExtrasHtml = gt.playExtras ? gt.playExtras(i, S.extras, colors[i]) : '';
       return `
         <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
