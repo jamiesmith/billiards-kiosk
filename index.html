@@ -16,6 +16,7 @@ layout: none
       --surface2: #272740;
       --border:   #3a3a5c;
       --accent:   #2e8a57;
+      --accent-rgb: 46,138,87;
       --accent-h: #3aad6e;
       --text:     #ddddf0;
       --muted:    #8888aa;
@@ -23,6 +24,8 @@ layout: none
       --a-dark:   #2d5a8e;
       --b:        #d4935a;
       --b-dark:   #8e5a2d;
+      --c:        #8fbf6a;
+      --c-dark:   #4f7a38;
       --danger:   #c04f4f;
     }
 
@@ -75,6 +78,7 @@ layout: none
     .btn-danger   { background: var(--danger); }
     .btn-a        { background: var(--a-dark); }
     .btn-b        { background: var(--b-dark); }
+    .btn-c        { background: var(--c-dark); }
     .btn-sm       { font-size: 0.85rem; min-height: 36px; padding: 0.3rem 0.7rem; }
     .btn-lg       { font-size: 1.25rem; min-height: 64px; padding: 1rem 1.2rem; width: 100%; }
     .btn-round    { border-radius: 50%; width: 48px; min-height: 48px; padding: 0; font-size: 1.4rem; display:inline-flex; align-items:center; justify-content:center; }
@@ -94,7 +98,7 @@ layout: none
     }
     .btn-game.active {
       border-color: var(--accent);
-      background: rgba(46,138,87,0.18);
+      background: rgba(var(--accent-rgb),0.18);
       color: var(--accent-h);
     }
 
@@ -116,7 +120,8 @@ layout: none
 
     /* ── Layout ──────────────────────────────────────────────────────────── */
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
-    .grid2-flat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.9rem; }
+    .grid2-flat { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; }
 
     /* ── Player slots ────────────────────────────────────────────────────── */
     .player-slot {
@@ -199,7 +204,7 @@ layout: none
       min-height: 52px;
       border-radius: 9px;
     }
-    .ss-btn.active { border-color: var(--accent); background: rgba(46,138,87,0.2); }
+    .ss-btn.active { border-color: var(--accent); background: rgba(var(--accent-rgb),0.2); }
 
     /* ── Straight pool extras ────────────────────────────────────────────── */
     .sp-grid     { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -234,6 +239,9 @@ layout: none
       grid-template-rows: 1fr;
       gap: 1.5vw; min-height: 0;
     }
+    .play-overlay .play-cards.cols-3 {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
     .play-overlay .score-card {
       border-radius: 2vw;
       display: flex; flex-direction: column;
@@ -246,16 +254,79 @@ layout: none
     .play-overlay .play-ball            { flex-shrink: 0; margin-bottom: 1vh; }
     .play-overlay .play-ball img        { width: min(16vw, 22vh); height: min(16vw, 22vh); display: block; }
     img[src*="billiard-ball"] { filter: none !important; }
+    /* Balls sit at the 5 points of a true pentagon (one up top, two upper
+       sides, two lower sides), positioned with real trig around a fixed
+       radius --R and sized off cqmin — the smaller of the CARD's own width
+       and height, via container queries, not the viewport. That's the part
+       that matters: a viewport-relative unit (vw/vh/vmin) doesn't know
+       whether this card is one of three side-by-side or the only one on
+       screen, so the same ball size that looks right in one layout can
+       overflow or collide with itself in a narrower one. cqmin scales with
+       whatever box the balls actually have to live in, and since both the
+       ball size (--ct-ball) and the pentagon's radius (--R) scale together
+       off the same unit, the ratio between "how big the balls are" and
+       "how far apart their centers sit" never changes — so they can't
+       start overlapping each other at some sizes and not others. */
+    .cutthroat-balls {
+      container-type: size;
+      /* Spacing --R is set equal to the ball size (a 1:1 ratio — adjacent
+         balls end up ~18% of a ball-width apart, a real visible gap).
+         With that ratio fixed, the pentagon's full bounding box works out
+         to 2.902 x ballSize wide (the row-2 side balls are the widest
+         point) and 2.809 x ballSize tall (top ball to bottom row). THE TWO
+         NUMBERS TO TWEAK are the 31cqw/32cqh below — each is "how much of
+         the card's width/height this pentagon may use"; raise either for
+         bigger balls, lower for smaller. min() takes whichever is more
+         restrictive, so it's always sized to fit both dimensions. */
+      --ct-ball: clamp(4rem, min(31cqw, 32cqh), 12rem);
+      --R: var(--ct-ball);
+      position: relative;
+      flex: 1; width: 100%; min-height: 0; margin-bottom: 1vh;
+    }
+    .ct-ball {
+      position: absolute;
+      background: none; border: none; padding: 0; min-height: 0;
+      width: var(--ct-ball); height: var(--ct-ball);
+      transform: translate(-50%, -50%);
+      transition: none;
+      cursor: pointer;
+    }
+    /* Override button:active's scale — it replaces (not adds to) the
+       translate() used to center each ball on its pentagon point, causing
+       a visible jump that can make a touchscreen tap register as cancelled
+       instead of a click. */
+    .ct-ball:active { transform: translate(-50%, -50%); }
+    /* top/left = container center (50%) offset by --R at angles 72° apart,
+       starting straight up (0,1) and going clockwise. */
+    .ct-ball:nth-child(1) { top: calc(50% - var(--R));            left: 50%;                      }
+    .ct-ball:nth-child(2) { top: calc(50% - var(--R) * 0.309);    left: calc(50% + var(--R) * 0.951); }
+    .ct-ball:nth-child(3) { top: calc(50% + var(--R) * 0.809);    left: calc(50% + var(--R) * 0.588); }
+    .ct-ball:nth-child(4) { top: calc(50% + var(--R) * 0.809);    left: calc(50% - var(--R) * 0.588); }
+    .ct-ball:nth-child(5) { top: calc(50% - var(--R) * 0.309);    left: calc(50% - var(--R) * 0.951); }
+    .ct-ball img { width: 100%; height: 100%; display: block; }
+    .ct-ball.hit img { filter: grayscale(1) brightness(0.5) !important; }
+    .ct-ball.hit::after {
+      content: ''; position: absolute; left: 6%; right: 6%; top: 50%;
+      height: 3px; background: rgba(255,255,255,0.9); border-radius: 2px;
+      transform: translateY(-50%) rotate(-25deg);
+    }
     .play-win-btn { display: none; }
-    .play-overlay .play-win-btn {
-      display: block; width: 80%; margin-top: auto; margin-bottom: 1vh; flex-shrink: 0;
-      background: var(--accent); color: #fff;
+    /* Shared pill styling for the bottom-of-card slot: either the "Win"
+       button (green) or, once a Cutthroat player is eliminated, a
+       non-interactive red pill in the exact same spot. */
+    .play-overlay .play-win-btn,
+    .eliminated-pill {
+      display: flex; align-items: center; justify-content: center;
+      width: 80%; margin-top: auto; margin-bottom: 1vh; flex-shrink: 0;
+      color: #fff;
       font-size: clamp(1.2rem, 3.5vw, 3rem); font-weight: 900;
       letter-spacing: 0.04em;
       min-height: unset; padding: 1.2vh 2vw;
       border-radius: 999px;
       text-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
+    .play-overlay .play-win-btn { background: var(--accent); }
+    .eliminated-pill { background: var(--danger); text-transform: uppercase; }
     .play-toolbar {
       position: relative;
       display: flex; justify-content: center; align-items: center;
@@ -342,6 +413,7 @@ layout: none
 
     @media (max-width: 520px) {
       .grid2     { grid-template-columns: 1fr; }
+      .grid3     { grid-template-columns: 1fr; }
       .grid2-flat { grid-template-columns: 1fr 1fr; }
       h1 { font-size: 1.5rem; }
     }
@@ -355,11 +427,14 @@ layout: none
 // Player roster comes from _data/billiards.yml, unless overridden per-load
 // with ?players=Alice,Bob,Chris (comma-separated names, no YAML edit needed).
 // ?a=Alice,Bob&b=Charlie pre-fills team A and team B (1-2 names each).
-// ?queue=Dave,Eve,Frank pre-fills the Up Next queue; names already in ?a=/?b=/?players= are skipped.
+// ?c=Dana pre-fills team C — only applies when ?game=cutthroat also resizes
+// the roster to 3 teams; ignored otherwise.
+// ?queue=Dave,Eve,Frank pre-fills the Up Next queue; names already in ?a=/?b=/?c=/?players= are skipped.
 const QP = {
   PLAYERS: 'players',
   TEAM_A: 'a',
   TEAM_B: 'b',
+  TEAM_C: 'c',
   QUEUE: 'queue',
   DEBUG: 'debug',
   GO: 'go',
@@ -383,10 +458,15 @@ const TEAM_B_OVERRIDE = (() => {
   if (!raw) return [];
   return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 2);
 })();
+const TEAM_C_OVERRIDE = (() => {
+  const raw = new URLSearchParams(location.search).get(QP.TEAM_C);
+  if (!raw) return [];
+  return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 1);
+})();
 const QUEUE_OVERRIDE = (() => {
   const raw = new URLSearchParams(location.search).get(QP.QUEUE);
   if (!raw) return [];
-  const taken = new Set([...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE]);
+  const taken = new Set([...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE, ...TEAM_C_OVERRIDE]);
   return raw.split(',').map(n => n.trim()).filter(n => n && !taken.has(n));
 })();
 
@@ -401,6 +481,11 @@ const EIGHT_BALL = {{ site.data.billiards.balls.eight_ball | jsonify }};
 const NINE_BALL = {{ site.data.billiards.balls.nine_ball | jsonify }};
 const TEN_BALL = {{ site.data.billiards.balls.ten_ball | jsonify }};
 const STRAIGHT_POOL_BALL = {{ site.data.billiards.balls.straight_pool | jsonify }};
+const CUTTHROAT_BALL = {{ site.data.billiards.balls.cutthroat | jsonify }};
+// The three ball groups a Cutthroat player can be assigned to defend.
+const CUTTHROAT_GROUPS = [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]];
+// Straight Pool "race to" choices, shared by the always-visible picker and the modal.
+const RACE_TO_OPTIONS = [50, 75, 100, 125, 150];
 
 function ballImg(file, size) {
   const px = BALL_PX[size] || 36;
@@ -525,13 +610,39 @@ const GAME_TYPES = {
         <hr class="divider">
         <div class="label" style="text-align:center;margin-bottom:0.4rem">Race to</div>
         <div style="display:flex;gap:0.4rem;justify-content:center">
-          ${[50,75,100,125,150].map(n => `
+          ${RACE_TO_OPTIONS.map(n => `
             <button class="btn-ghost btn-sm ${target===n?'ss-btn active':''}"
               style="flex:1" onclick="D('setTarget',${n})">${n}</button>
           `).join('')}
         </div>
       </div>`;
     },
+  },
+
+  // 3 individual players, no partners. Ball groups (1-5/6-10/11-15) and
+  // play order are both randomized once, up front, when the game begins —
+  // see randomOrder below and the 'start'/'playAgain'/'newGame' cases in D().
+  'cutthroat': {
+    id: 'cutthroat', name: 'Cutthroat',
+    maxTeams: 3,
+    maxPlayers: 1,
+    randomOrder: true,
+    ballHtml: (size='lg') => ballImg(CUTTHROAT_BALL, size),
+    initExtras: () => ({
+      groups: shuffle([0, 1, 2]),
+      hit: Array.from({ length: 3 }, () => Array(5).fill(false)),
+    }),
+    playBallPicker(teamIdx, ex) {
+      const nums = CUTTHROAT_GROUPS[ex.groups[teamIdx]];
+      const hit = ex.hit[teamIdx];
+      return `<div class="cutthroat-balls">
+        ${nums.map((n, bi) => `
+          <button class="ct-ball ${hit[bi] ? 'hit' : ''}" onclick="D('toggleBall',${teamIdx},${bi})">
+            <img src="${ASSETS_DIR}billiard-ball-${n}.png">
+          </button>`).join('')}
+      </div>`;
+    },
+    renderExtras: () => '',
   },
 };
 
@@ -546,7 +657,10 @@ let queuePending = [];
 (function applyDebug() {
   const p = new URLSearchParams(location.search);
   if (!p.has(QP.DEBUG)) return;
-  if (p.get(QP.GAME) && GAME_TYPES[p.get(QP.GAME)]) S.gameType = p.get(QP.GAME);
+  if (p.get(QP.GAME) && GAME_TYPES[p.get(QP.GAME)]) {
+    S.gameType = p.get(QP.GAME);
+    resizeTeams(maxTeamsFor(S.gameType));
+  }
   if (p.get(QP.GO) === '1') {
     S.extras = GAME_TYPES[S.gameType].initExtras();
     if (p.get(QP.TARGET)) S.extras.target = +p.get(QP.TARGET);
@@ -556,6 +670,8 @@ let queuePending = [];
 
 if (TEAM_A_OVERRIDE.length > 0) S.teams[0].players = [...TEAM_A_OVERRIDE];
 if (TEAM_B_OVERRIDE.length > 0) S.teams[1].players = [...TEAM_B_OVERRIDE];
+// Only applies if ?game= already resized the roster to 3 teams (Cutthroat).
+if (TEAM_C_OVERRIDE.length > 0 && S.teams[2]) S.teams[2].players = [...TEAM_C_OVERRIDE];
 if (QUEUE_OVERRIDE.length > 0)
   QUEUE_OVERRIDE.forEach(name => S.queue.push({ players: [name] }));
 
@@ -592,22 +708,55 @@ function currentElapsedMs() {
 }
 
 // ── TEAM COLORS ─────────────────────────────────────────────────────────────
-// Alpha-blended backgrounds are derived from the --a/--b CSS custom properties
-// at load time, so the palette only has to be edited in one place (the :root
-// block up top) instead of also updating hand-copied rgba(...) literals here.
+// Alpha-blended backgrounds are derived from the --a/--b/--c CSS custom
+// properties at load time, so the palette only has to be edited in one place
+// (the :root block up top) instead of also updating hand-copied rgba(...)
+// literals here. Most game types only ever use the first two.
 function hexToRgb(hex) {
   const n = parseInt(hex.trim().replace('#', ''), 16);
   return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
 }
 const rootStyle = getComputedStyle(document.documentElement);
-const TEAM_RGB = [hexToRgb(rootStyle.getPropertyValue('--a')), hexToRgb(rootStyle.getPropertyValue('--b'))];
+const TEAM_RGB = ['--a', '--b', '--c'].map(v => hexToRgb(rootStyle.getPropertyValue(v)));
+const TEAM_COLOR_VARS = ['var(--a)', 'var(--b)', 'var(--c)'];
+const TEAM_BTN_CLASS = ['btn-a', 'btn-b', 'btn-c'];
+const TEAM_LETTERS = ['A', 'B', 'C'];
 function teamAlpha(i, alpha) { return `rgba(${TEAM_RGB[i]},${alpha})`; }
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
 function allPlayers() { return [...BASE_PLAYERS, ...S.adHoc]; }
-function takenSet()   { return new Set([...S.teams[0].players, ...S.teams[1].players]); }
-function teamLabel(i) { return S.teams[i].players.join(' & ') || (i === 0 ? 'Team A' : 'Team B'); }
+function takenSet()   { return new Set(S.teams.flatMap(t => t.players)); }
+function teamLabel(i) { return S.teams[i].players.join(' & ') || `Team ${TEAM_LETTERS[i]}`; }
 function winVerb(i)   { return S.teams[i].players.length > 1 ? 'win' : 'wins'; }
+// Cutthroat only: a player is eliminated once all 5 of their balls are hit.
+function isEliminated(teamIdx) {
+  return S.gameType === 'cutthroat' && !!S.extras.hit && S.extras.hit[teamIdx].every(Boolean);
+}
+// How many team slots / players-per-slot the current game type needs.
+// Games without these fields default to the classic 2 teams of up to 2.
+function maxTeamsFor(gameType)   { return (GAME_TYPES[gameType] && GAME_TYPES[gameType].maxTeams) || 2; }
+function maxPlayersFor(gameType) { return (GAME_TYPES[gameType] && GAME_TYPES[gameType].maxPlayers) || 2; }
+function resizeTeams(count) {
+  while (S.teams.length < count) S.teams.push({ players: [], shooterIdx: 0, wins: 0 });
+  while (S.teams.length > count) S.teams.pop();
+}
+// [0,1] for a 2-team game, [0,1,2] for Cutthroat — used anywhere code needs
+// to loop over "every team index" rather than a specific team's players.
+function teamIndices() { return S.teams.map((_, i) => i); }
+// The setup/game/summary grids all render one card per team; Cutthroat's
+// 3rd card needs the wider layout, everything else uses the standard 2-up one.
+function teamsGridClass() { return S.teams.length === 3 ? 'grid3' : 'grid2'; }
+// Fisher-Yates using crypto randomness, same fairness bar as coinFlip.
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const r = new Uint32Array(1);
+    crypto.getRandomValues(r);
+    const j = r[0] % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 function sessionRecord(players) {
   let w = 0, l = 0;
   S.gameHistory.forEach(({ winners, losers }) => {
@@ -636,9 +785,19 @@ function debugUrl() {
   return qs;
 }
 function putWinnerLeft(winnerIdx) {
-  if (winnerIdx !== 1) return;
+  if (S.teams.length !== 2 || winnerIdx !== 1) return;
   [S.teams[0], S.teams[1]] = [S.teams[1], S.teams[0]];
   if (S.breakTeam !== null) S.breakTeam ^= 1;
+}
+// For game types that need a fully randomized play order up front
+// (Cutthroat) rather than a coin flip — reorders the team slots and seats
+// the break on whoever landed first. Returns whether it did anything, so
+// callers can fall back to their normal breakTeam logic otherwise.
+function randomizeOrderIfNeeded() {
+  if (!GAME_TYPES[S.gameType].randomOrder) return false;
+  S.teams = shuffle(S.teams);
+  S.breakTeam = 0;
+  return true;
 }
 // Strips any queue entry containing one of these names, so someone being
 // seated at the table can't also be left sitting in the queue elsewhere.
@@ -659,10 +818,13 @@ function xa(s) { return x(s).replace(/'/g,'&#39;'); }
 function D(action, a, b) {
   const T = S.teams;
   switch (action) {
-    case 'gameType': S.gameType = a; break;
+    case 'gameType':
+      S.gameType = a;
+      resizeTeams(maxTeamsFor(a));
+      break;
 
     case 'addPlayer':
-      if (T[a].players.length < 2 && !takenSet().has(b))
+      if (T[a].players.length < maxPlayersFor(S.gameType) && !takenSet().has(b))
         T[a].players.push(b);
       break;
 
@@ -680,23 +842,25 @@ function D(action, a, b) {
     case 'start':
       S.extras = GAME_TYPES[S.gameType].initExtras();
       S.gamesPlayed = 0;
-      S.breakTeam = null;
-      const inGame = new Set([...T[0].players, ...T[1].players]);
+      if (!randomizeOrderIfNeeded()) S.breakTeam = null;
+      const inGame = new Set(S.teams.flatMap(t => t.players));
       S.queue = QUEUE_OVERRIDE.map(name => ({ players: [name] }))
         .filter(e => e.players.every(p => !inGame.has(p)));
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
-      T.forEach(t => { t.wins = 0; t.shooterIdx = 0; });
+      S.teams.forEach(t => { t.wins = 0; t.shooterIdx = 0; });
       S.view = 'game';
       playMode = true;
       break;
 
     case 'win': {
-      const other = a ^ 1;
+      // Generalized "everyone but the winner" instead of a^1, so this works
+      // the same for a 2-team game (one loser) and Cutthroat (two losers).
+      const others = teamIndices().filter(i => i !== a);
       T[a].wins++;
       S.gamesPlayed++;
-      S.gameHistory.push({ winners: [...T[a].players], losers: [...T[other].players] });
-      [a, other].forEach(i => {
+      S.gameHistory.push({ winners: [...T[a].players], losers: others.flatMap(i => T[i].players) });
+      [a, ...others].forEach(i => {
         if (T[i].players.length > 1)
           T[i].shooterIdx = T[i].shooterIdx ^ 1;
       });
@@ -709,18 +873,21 @@ function D(action, a, b) {
       const prevTarget = S.extras.target;
       const winner = S.lastWinner;
       S.lastWinner = null;
-      S.breakTeam = winner;
       S.extras = GAME_TYPES[S.gameType].initExtras();
       if (prevTarget !== undefined) S.extras.target = prevTarget;
+      if (!randomizeOrderIfNeeded()) {
+        S.breakTeam = winner;
+        putWinnerLeft(winner);
+      }
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
-      putWinnerLeft(winner);
       playMode = true;
       break;
     }
 
     case 'playNext': {
-      if (S.queue.length === 0) break;
+      // Queue rotation isn't designed for >2 teams yet (Cutthroat).
+      if (S.queue.length === 0 || S.teams.length !== 2) break;
       const winner = S.lastWinner;
       const loser = winner ^ 1;
       const next = S.queue.shift();
@@ -744,7 +911,8 @@ function D(action, a, b) {
     // Winner steps aside (still on a hot streak, but wants others to play);
     // the loser stays at the table to face the next challenger in queue.
     case 'deferNext': {
-      if (S.queue.length === 0) break;
+      // Queue rotation isn't designed for >2 teams yet (Cutthroat).
+      if (S.queue.length === 0 || S.teams.length !== 2) break;
       const winner = S.lastWinner;
       const loser = winner ^ 1;
       const next = S.queue.shift();
@@ -781,6 +949,10 @@ function D(action, a, b) {
     case 'setSolids':  S.extras.solidsTeam = a; break;
     case 'setStripes': S.extras.solidsTeam = a ^ 1; break;
 
+    case 'toggleBall': // a = team index, b = ball index within that team's group of 5
+      S.extras.hit[a][b] = !S.extras.hit[a][b];
+      break;
+
     case 'adjScore': {
       const scores = [...S.extras.scores];
       scores[a] = Math.max(0, scores[a] + b);
@@ -799,11 +971,11 @@ function D(action, a, b) {
     case 'endSession': S.view = 'summary'; break;
     case 'goHome': playMode = false; S.view = 'setup'; S.lastWinner = null; break;
 
-    case 'coinFlip': { const b = new Uint8Array(1); crypto.getRandomValues(b); S.breakTeam = b[0] & 1; break; }
+    case 'coinFlip': { const b = new Uint8Array(1); crypto.getRandomValues(b); S.breakTeam = b[0] % S.teams.length; break; }
 
     case 'newGame':
       S.extras = GAME_TYPES[S.gameType].initExtras();
-      S.breakTeam = null;
+      if (!randomizeOrderIfNeeded()) S.breakTeam = null;
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
       S.view = 'game';
@@ -822,18 +994,19 @@ function D(action, a, b) {
 // ── SETUP VIEW ──────────────────────────────────────────────────────────────
 function viewSetup() {
   const taken = takenSet();
+  const maxPlayers = maxPlayersFor(S.gameType);
 
   const teamCards = S.teams.map((team, ti) => {
-    const color = ti === 0 ? 'var(--a)' : 'var(--b)';
+    const color = TEAM_COLOR_VARS[ti];
     const available = allPlayers().filter(p => !taken.has(p));
-    const canAdd = team.players.length < 2;
+    const canAdd = team.players.length < maxPlayers;
 
-    const slots = [0, 1].map(si => {
+    const slots = Array.from({ length: maxPlayers }, (_, si) => {
       const p = team.players[si];
       if (p) return `
         <div class="player-slot">
           <span class="name">${x(p)}</span>
-          ${team.players.length === 2 && si === team.shooterIdx ? '<span class="badge">shoots first</span>' : ''}
+          ${team.players.length > 1 && si === team.shooterIdx ? '<span class="badge">shoots first</span>' : ''}
           <button class="btn-ghost btn-sm"
             onclick="D('removePlayer',${ti},${si})">✕</button>
         </div>`;
@@ -842,9 +1015,9 @@ function viewSetup() {
 
     return `
       <div class="card" style="border-color:${color}">
-        <h2>Team ${ti === 0 ? 'A' : 'B'}</h2>
+        <h2>Team ${TEAM_LETTERS[ti]}</h2>
         ${slots}
-        ${team.players.length === 2
+        ${team.players.length > 1
           ? `<button class="btn-ghost btn-sm mt-sm" onclick="D('swapOrder',${ti})">↕ Swap shooting order</button>`
           : ''}
         ${canAdd ? `
@@ -879,7 +1052,7 @@ function viewSetup() {
       </div>
     </div>
 
-    <div class="grid2">${teamCards}</div>
+    <div class="${teamsGridClass()}">${teamCards}</div>
 
 <button class="btn-primary btn-lg" onclick="D('start')" ${canStart ? '' : 'disabled'}>
       Start Game →
@@ -892,13 +1065,15 @@ function viewGame() {
   const gt = GAME_TYPES[S.gameType];
   const scorecards = buildScorecards().join('');
 
+  const gridClass = teamsGridClass();
+
   return `
     <div class="game-header">
       <div class="game-badge">${gt.ballHtml('sm')} ${x(gt.name)} · Game ${S.gamesPlayed + 1}</div>
-      <h1>${x(teamLabel(0))} vs ${x(teamLabel(1))}</h1>
+      <h1>${S.teams.map((_, i) => x(teamLabel(i))).join(' vs ')}</h1>
     </div>
 
-    <div class="grid2">${scorecards}</div>
+    <div class="${gridClass}">${scorecards}</div>
 
     ${S.lastWinner === null ? gt.renderExtras(S.extras, S.teams) : ''}
 
@@ -907,7 +1082,7 @@ function viewGame() {
       <div style="font-size:2rem;font-weight:800;margin-bottom:0.75rem">
         🏆 ${x(teamLabel(S.lastWinner))} ${winVerb(S.lastWinner)}!
       </div>
-      ${S.queue.length > 0
+      ${S.teams.length === 2 && S.queue.length > 0
         ? `<button class="btn-primary btn-lg" onclick="D('playNext')">▶ Play Next: ${x(S.queue[0].players.join(' & '))}</button>
            <button class="btn-primary btn-sm" style="margin-top:0.6rem" onclick="D('deferNext')">
              ↷ Defer: ${x(teamLabel(S.lastWinner ^ 1))} vs ${x(S.queue[0].players.join(' & '))}
@@ -917,9 +1092,8 @@ function viewGame() {
     ` : `
     <div class="card">
       <h3>Record Win</h3>
-      <div class="grid2">
-        <button class="btn-a btn-lg" onclick="D('win',0)">${x(teamLabel(0))} Wins</button>
-        <button class="btn-b btn-lg" onclick="D('win',1)">${x(teamLabel(1))} Wins</button>
+      <div class="${gridClass}">
+        ${S.teams.map((t, i) => `<button class="${TEAM_BTN_CLASS[i]} btn-lg" onclick="D('win',${i})">${x(teamLabel(i))} Wins</button>`).join('')}
       </div>
     </div>
     `}
@@ -934,15 +1108,16 @@ function viewGame() {
 
 // ── SUMMARY VIEW ─────────────────────────────────────────────────────────────
 function viewSummary() {
-  const [a, b] = S.teams;
-  const winnerIdx = a.wins > b.wins ? 0 : b.wins > a.wins ? 1 : null;
-  const colors  = ['var(--a)', 'var(--b)'];
-  const bgAlpha = [teamAlpha(0, 0.2), teamAlpha(1, 0.2)];
+  const maxWins = Math.max(...S.teams.map(t => t.wins));
+  const topTeams = teamIndices().filter(i => S.teams[i].wins === maxWins);
+  const winnerIdx = topTeams.length === 1 ? topTeams[0] : null;
+  const colors  = S.teams.map((_, i) => TEAM_COLOR_VARS[i]);
+  const bgAlpha = S.teams.map((_, i) => teamAlpha(i, 0.2));
 
   const cards = S.teams.map((t, i) => `
     <div class="summary-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
       <div class="sc-name" style="font-size:1.2rem;font-weight:700">${x(teamLabel(i))}</div>
-      <div class="big-score" style="color:${colors[i]}">${t.wins}–${S.teams[i^1].wins}</div>
+      <div class="big-score" style="color:${colors[i]}">${S.teams.length === 2 ? `${t.wins}–${S.teams[i^1].wins}` : t.wins}</div>
     </div>`).join('');
 
   // Per-player records from game history
@@ -988,7 +1163,7 @@ function viewSummary() {
     ${winnerIdx !== null
       ? `<p class="big-msg">🏆 ${x(teamLabel(winnerIdx))} ${winVerb(winnerIdx)} the session!</p>`
       : `<p class="big-msg muted">It's a tie!</p>`}
-    <div class="grid2 mt-1">${cards}</div>
+    <div class="${teamsGridClass()} mt-1">${cards}</div>
     <p class="center muted mt-1">${S.gamesPlayed} game${S.gamesPlayed !== 1 ? 's' : ''} · ${x(GAME_TYPES[S.gameType].name)}</p>
     ${playerTable}
     <div class="action-stack mt-1">
@@ -1005,10 +1180,9 @@ const BANNER = `<div style="text-align:center;margin-bottom:1.25rem">
 
 function buildScorecards(forPlay = false) {
   const gt = GAME_TYPES[S.gameType];
-  const colors  = ['var(--a)', 'var(--b)'];
-  const bgAlpha = [teamAlpha(0, 0.15), teamAlpha(1, 0.15)];
+  const colors  = S.teams.map((_, i) => TEAM_COLOR_VARS[i]);
+  const bgAlpha = S.teams.map((_, i) => teamAlpha(i, 0.15));
   return S.teams.map((t, i) => {
-    const other = i ^ 1;
     const players = t.players.length
       ? t.players.map((p, pi) => {
           const shooting = pi === t.shooterIdx;
@@ -1028,29 +1202,42 @@ function buildScorecards(forPlay = false) {
           ? `<div class="play-ball">${gt.teamBadge(i, S.extras)}</div>`
           : `<div class="play-ball">${gt.ballHtml('score')}</div>`;
       const playExtrasHtml = gt.playExtras ? gt.playExtras(i, S.extras, colors[i]) : '';
+      const winSlot = isEliminated(i)
+        ? `<div class="eliminated-pill">Eliminated</div>`
+        : `<button class="play-win-btn" onclick="playMode=false;D('win',${i})">🏆 Win</button>`;
       return `
         <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
           <div class="sc-name">${x(displayName)}</div>
           ${S.breakTeam === i && S.extras.solidsTeam == null ? '<div class="break-badge">Break</div>' : ''}
           ${ballHtml}
           ${playExtrasHtml}
-          <button class="play-win-btn" onclick="playMode=false;D('win',${i})">🏆 Win</button>
+          ${winSlot}
         </div>`;
     }
 
     const badge = gt.teamBadge ? gt.teamBadge(i, S.extras) : '';
     const { w: myW, l: myL } = sessionRecord(t.players);
-    const { w: theirW } = sessionRecord(S.teams[other].players);
-    const { wA: h2hW, wB: h2hL } = headToHead(t.players, S.teams[other].players);
-    const tallyLabel = myW > theirW ? 'Leads' : myW < theirW ? 'Down' : 'Tied';
     const tallyScore = `${myW}–${myL}`;
-    const h2hHtml = h2hW + h2hL > 0
-      ? `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.2rem">${tallyLabel} · H2H ${h2hW}–${h2hL}</div>`
-      : `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.2rem">${tallyLabel}</div>`;
-    const tallyHtml = `<div style="text-align:center;margin-top:0.5rem">
-      <div class="sc-wins" style="color:${colors[i]}">${tallyScore}</div>
-      ${h2hHtml}
-    </div>`;
+    // "Leads/Down/Tied" and head-to-head only make sense with a single
+    // opponent; Cutthroat's 3 teams just show each player's own W-L.
+    let tallyHtml;
+    if (S.teams.length === 2) {
+      const other = i ^ 1;
+      const { w: theirW } = sessionRecord(S.teams[other].players);
+      const { wA: h2hW, wB: h2hL } = headToHead(t.players, S.teams[other].players);
+      const tallyLabel = myW > theirW ? 'Leads' : myW < theirW ? 'Down' : 'Tied';
+      const h2hHtml = h2hW + h2hL > 0
+        ? `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.2rem">${tallyLabel} · H2H ${h2hW}–${h2hL}</div>`
+        : `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.2rem">${tallyLabel}</div>`;
+      tallyHtml = `<div style="text-align:center;margin-top:0.5rem">
+        <div class="sc-wins" style="color:${colors[i]}">${tallyScore}</div>
+        ${h2hHtml}
+      </div>`;
+    } else {
+      tallyHtml = `<div style="text-align:center;margin-top:0.5rem">
+        <div class="sc-wins" style="color:${colors[i]}">${tallyScore}</div>
+      </div>`;
+    }
     return `
       <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
         <div class="sc-name">${x(displayName)}</div>
@@ -1069,16 +1256,17 @@ function render() {
   const el = document.getElementById('app');
 
   if (playMode && S.view === 'game') {
-    const [cardA, cardB] = buildScorecards(true);
+    const cards = buildScorecards(true).join('');
+    const cardsClass = S.teams.length === 3 ? 'play-cards cols-3' : 'play-cards';
     const upNextLabel = S.queue.length > 0
       ? `👥 Up Next: ${x(S.queue[0].players.join(' & '))}`
       : `👥 Up Next`;
     el.innerHTML = `
       <div class="play-overlay">
         <button class="play-close" onclick="modal('End this game and return to setup?',()=>D('goHome'))">✕</button>
-        <div class="play-cards">${cardA}${cardB}</div>
+        <div class="${cardsClass}">${cards}</div>
         <div class="play-toolbar">
-          <button onclick="D('coinFlip')"><img src="${ASSETS_DIR}coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>
+          ${GAME_TYPES[S.gameType].randomOrder ? '' : `<button onclick="D('coinFlip')"><img src="${ASSETS_DIR}coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>`}
           <button onclick="showQueueModal()">${upNextLabel}</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
           <div class="play-timer" id="game-timer" data-timer-visible="false" onclick="toggleGameTimer()">⌚</div>
@@ -1102,7 +1290,7 @@ function showTargetPicker() {
       <div class="modal">
         <p>Playing to…</p>
         <div style="display:flex;flex-direction:column;gap:0.6rem">
-          ${[50,75,100,125,150].map(n => `
+          ${RACE_TO_OPTIONS.map(n => `
             <button class="${n === current ? 'btn-primary' : 'btn-ghost'}"
               onclick="D('setTarget',${n});closeModal()">
               ${n}${n === current ? ' ✓' : ''}
@@ -1116,9 +1304,9 @@ window.showTargetPicker = showTargetPicker;
 
 function showQueueModal() {
   const root = document.getElementById('modal-root');
-  const isPartner = S.teams.some(t => t.players.length === 2);
+  const isPartner = S.teams.some(t => t.players.length > 1);
   const maxSize = isPartner ? 2 : 1;
-  const inGame = new Set([...S.teams[0].players, ...S.teams[1].players]);
+  const inGame = new Set(S.teams.flatMap(t => t.players));
   const inQueue = new Set(S.queue.flatMap(e => e.players));
   const available = allPlayers().filter(p => !inGame.has(p) && !inQueue.has(p) && !queuePending.includes(p));
 
@@ -1132,7 +1320,7 @@ function showQueueModal() {
         </div>`).join('');
 
   const pendingHtml = queuePending.length > 0 ? `
-    <div style="display:flex;align-items:center;gap:0.5rem;background:rgba(46,138,87,0.15);border:1px solid var(--accent);border-radius:9px;padding:0.5rem 0.75rem;margin-bottom:0.5rem">
+    <div style="display:flex;align-items:center;gap:0.5rem;background:rgba(var(--accent-rgb),0.15);border:1px solid var(--accent);border-radius:9px;padding:0.5rem 0.75rem;margin-bottom:0.5rem">
       <span style="flex:1;font-weight:600">${x(queuePending.join(' & '))}</span>
       <button class="btn-ghost btn-sm" onclick="queuePending=[];showQueueModal()">✕</button>
       ${queuePending.length === maxSize
