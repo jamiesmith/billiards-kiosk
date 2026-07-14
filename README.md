@@ -6,7 +6,7 @@ Live at [billiards.grandelatte.com](https://billiards.grandelatte.com).
 
 ## What it does
 
-- **Game types** — 8-Ball, 9-Ball, 10-Ball, and Straight Pool, each with their own scoring UI (solids/stripes tracking for 8-Ball, a running point total with race-to targets for Straight Pool).
+- **Game types** — 8-Ball, 9-Ball, 10-Ball, Straight Pool, and Cutthroat, each with their own scoring UI (solids/stripes tracking for 8-Ball, a running point total with race-to targets for Straight Pool, randomized ball groups and a tap-to-mark pentagon of balls for Cutthroat's 3 players).
 - **Teams or singles** — put one or two players per side; with two, the app tracks shooting order and alternates it after every win.
 - **Play Mode** — a full-screen, landscape-friendly scoreboard meant to be read from across the room, with a big "Win" button per side and a coin flip to decide who breaks.
 - **Winner-stays-on queue** — add players to an "up next" queue mid-session; when a game ends, the loser's spot is backfilled by the next name in line.
