@@ -16,30 +16,36 @@ layout: none
 <div id="modal-root"></div>
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-// Player roster comes from _data/billiards.yml, unless overridden per-load
-// with ?players=Alice,Bob,Chris (comma-separated names, no YAML edit needed).
-// ?a=Alice,Bob&b=Charlie pre-fills team A and team B (1-2 names each).
-// ?c=Dana pre-fills team C — only applies when ?game=cutthroat also resizes
-// the roster to 3 teams; ignored otherwise.
-// ?queue=Dave,Eve,Frank pre-fills the Up Next queue; names already in ?a=/?b=/?c=/?players= are skipped.
+// The whole game can be pre-configured via the URL — handy for jumping
+// straight into a specific matchup without touching the Setup screen:
+//   ?players=Alice,Bob,Chris   roster shown on Setup (defaults to
+//                              _data/billiards.yml). Anyone named in
+//                              ?a=/?b=/?c=/?queue= is added automatically
+//                              even if they're not listed here.
+//   ?a=Alice,Bob&b=Charlie     pre-fill team A / team B (1-2 names each)
+//   ?c=Dana                    pre-fill team C (Elimination only)
+//   ?queue=Eve,Frank           pre-fill the Up Next queue (ignored for
+//                              Elimination — no queue rotation there yet)
+//   ?game=8-ball               8-ball | 9-ball | 10-ball | straightpool |
+//                              elimination — also jumps straight to Play Mode
+//   ?to=75                     race-to score (Straight Pool only)
 const QP = {
   PLAYERS: 'players',
   TEAM_A: 'a',
   TEAM_B: 'b',
   TEAM_C: 'c',
   QUEUE: 'queue',
-  DEBUG: 'debug',
-  GO: 'go',
   GAME: 'game',
-  TARGET: 'target',
+  TO: 'to',
 };
-const DEFAULT_PLAYERS = {{ site.data.billiards.players | jsonify }};
-const BASE_PLAYERS = (() => {
-  const raw = new URLSearchParams(location.search).get(QP.PLAYERS);
-  if (!raw) return DEFAULT_PLAYERS;
-  const names = raw.split(',').map(n => n.trim()).filter(Boolean);
-  return names.length ? names : DEFAULT_PLAYERS;
-})();
+// Friendly URL names → internal GAME_TYPES ids.
+const GAME_ALIASES = {
+  '8-ball': 'eight-ball',
+  '9-ball': 'nine-ball',
+  '10-ball': 'ten-ball',
+  'straightpool': 'straight-pool',
+  'elimination': 'cutthroat',
+};
 const TEAM_A_OVERRIDE = (() => {
   const raw = new URLSearchParams(location.search).get(QP.TEAM_A);
   if (!raw) return [];
@@ -60,6 +66,18 @@ const QUEUE_OVERRIDE = (() => {
   if (!raw) return [];
   const taken = new Set([...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE, ...TEAM_C_OVERRIDE]);
   return raw.split(',').map(n => n.trim()).filter(n => n && !taken.has(n));
+})();
+const DEFAULT_PLAYERS = {{ site.data.billiards.players | jsonify }};
+// Roster shown on Setup: explicit ?players= (or the YAML default), plus
+// anyone named in ?a=/?b=/?c=/?queue= who isn't already in that list.
+const BASE_PLAYERS = (() => {
+  const raw = new URLSearchParams(location.search).get(QP.PLAYERS);
+  const explicit = raw ? raw.split(',').map(n => n.trim()).filter(Boolean) : [];
+  const base = [...(explicit.length ? explicit : DEFAULT_PLAYERS)];
+  [...TEAM_A_OVERRIDE, ...TEAM_B_OVERRIDE, ...TEAM_C_OVERRIDE, ...QUEUE_OVERRIDE].forEach(n => {
+    if (!base.includes(n)) base.push(n);
+  });
+  return base;
 })();
 
 // ── GAME TYPE REGISTRY ──────────────────────────────────────────────────────
@@ -243,29 +261,20 @@ let S = freshState();
 let playMode = false;
 let queuePending = [];
 
-// ── DEBUG MODE ───────────────────────────────────────────────────────────────
-// Use ?debug with ?a=, ?b=, ?queue=, ?players= to configure state.
-// Add ?go=1 to skip setup and jump straight into the game.
-(function applyDebug() {
-  const p = new URLSearchParams(location.search);
-  if (!p.has(QP.DEBUG)) return;
-  if (p.get(QP.GAME) && GAME_TYPES[p.get(QP.GAME)]) {
-    S.gameType = p.get(QP.GAME);
-    resizeTeams(maxTeamsFor(S.gameType));
-  }
-  if (p.get(QP.GO) === '1') {
-    S.extras = GAME_TYPES[S.gameType].initExtras();
-    if (p.get(QP.TARGET)) S.extras.target = +p.get(QP.TARGET);
-    S.view = 'game';
-  }
-})();
-
+// ── URL CONFIG ──────────────────────────────────────────────────────────────
+// Applies the ?a=/?b=/?c=/?game=/?to= overrides described above. QUEUE_OVERRIDE
+// isn't applied here — it's read directly by the 'start' case in D(), since
+// that's the only place it's ever actually needed.
 if (TEAM_A_OVERRIDE.length > 0) S.teams[0].players = [...TEAM_A_OVERRIDE];
 if (TEAM_B_OVERRIDE.length > 0) S.teams[1].players = [...TEAM_B_OVERRIDE];
-// Only applies if ?game= already resized the roster to 3 teams (Cutthroat).
+
+const requestedGame = GAME_ALIASES[new URLSearchParams(location.search).get(QP.GAME)];
+if (requestedGame) {
+  S.gameType = requestedGame;
+  resizeTeams(maxTeamsFor(requestedGame));
+}
+// Only applies once ?game= has resized the roster to 3 teams (Elimination).
 if (TEAM_C_OVERRIDE.length > 0 && S.teams[2]) S.teams[2].players = [...TEAM_C_OVERRIDE];
-if (QUEUE_OVERRIDE.length > 0)
-  QUEUE_OVERRIDE.forEach(name => S.queue.push({ players: [name] }));
 
 function freshState() {
   return {
@@ -367,15 +376,6 @@ function headToHead(playersA, playersB) {
   });
   return { wA, wB };
 }
-function debugUrl() {
-  const hasExplicitPlayers = new URLSearchParams(location.search).has(QP.PLAYERS);
-  const all = hasExplicitPlayers ? BASE_PLAYERS : BASE_PLAYERS.slice(0, 4);
-  let qs = `?${QP.DEBUG}&${QP.PLAYERS}=` + all.join(',');
-  if (all[0]) qs += `&${QP.TEAM_A}=` + all[0];
-  if (all[1]) qs += `&${QP.TEAM_B}=` + all[1];
-  if (all.length > 2) qs += `&${QP.QUEUE}=` + all.slice(2).join(',');
-  return qs;
-}
 function putWinnerLeft(winnerIdx) {
   if (S.teams.length !== 2 || winnerIdx !== 1) return;
   [S.teams[0], S.teams[1]] = [S.teams[1], S.teams[0]];
@@ -433,10 +433,14 @@ function D(action, a, b) {
 
     case 'start':
       S.extras = GAME_TYPES[S.gameType].initExtras();
+      // a = optional race-to override (from ?to=), only meaningful for games
+      // whose extras actually have a target (Straight Pool).
+      if (a !== undefined && S.extras.target !== undefined) S.extras.target = a;
       S.gamesPlayed = 0;
       if (!randomizeOrderIfNeeded()) S.breakTeam = null;
       const inGame = new Set(S.teams.flatMap(t => t.players));
-      S.queue = QUEUE_OVERRIDE.map(name => ({ players: [name] }))
+      // No queue rotation for Elimination yet — see playNext/deferNext.
+      S.queue = S.gameType === 'cutthroat' ? [] : QUEUE_OVERRIDE.map(name => ({ players: [name] }))
         .filter(e => e.players.every(p => !inGame.has(p)));
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
@@ -649,7 +653,7 @@ function viewSetup() {
 <button class="btn-primary btn-lg" onclick="D('start')" ${canStart ? '' : 'disabled'}>
       Start Game →
     </button>
-    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon &nbsp;·&nbsp; <a href="${debugUrl()}" style="color:inherit;text-decoration:none">debug</a> &nbsp;·&nbsp; {{ site.time | date: "%Y-%m-%d %H:%M" }} UTC</p>`;
+    <p style="text-align:center;font-size:0.65rem;opacity:0.35;margin-top:1.5rem">Ball icons by Boris Farias – Flaticon &nbsp;·&nbsp; <a href="?game=8-ball&a=Jamie&b=Amy&queue=Gaga&players=Payton" style="color:inherit;text-decoration:none">demo</a> &nbsp;·&nbsp; <a href="#" onclick="showHelpModal();return false;" style="color:inherit;text-decoration:none">help</a> &nbsp;·&nbsp; {{ site.time | date: "%Y-%m-%d %H:%M" }} UTC</p>`;
 }
 
 // ── GAME VIEW ───────────────────────────────────────────────────────────────
@@ -700,8 +704,13 @@ function viewGame() {
 
 // ── SUMMARY VIEW ─────────────────────────────────────────────────────────────
 function viewSummary() {
-  const maxWins = Math.max(...S.teams.map(t => t.wins));
-  const topTeams = teamIndices().filter(i => S.teams[i].wins === maxWins);
+  // t.wins only tracks the current seat's streak — it resets whenever a
+  // fresh challenger rotates in via Play Next, so it understates anyone
+  // who got rotated out and back in. sessionRecord() reads the real
+  // per-player history instead, same as the live in-game scorecard does.
+  const records = S.teams.map(t => sessionRecord(t.players));
+  const maxWins = Math.max(...records.map(r => r.w));
+  const topTeams = teamIndices().filter(i => records[i].w === maxWins);
   const winnerIdx = topTeams.length === 1 ? topTeams[0] : null;
   const colors  = S.teams.map((_, i) => TEAM_COLOR_VARS[i]);
   const bgAlpha = S.teams.map((_, i) => teamAlpha(i, 0.2));
@@ -709,7 +718,7 @@ function viewSummary() {
   const cards = S.teams.map((t, i) => `
     <div class="summary-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
       <div class="sc-name" style="font-size:1.2rem;font-weight:700">${x(teamLabel(i))}</div>
-      <div class="big-score" style="color:${colors[i]}">${S.teams.length === 2 ? `${t.wins}–${S.teams[i^1].wins}` : t.wins}</div>
+      <div class="big-score" style="color:${colors[i]}">${records[i].w}–${records[i].l}</div>
     </div>`).join('');
 
   // Per-player records from game history
@@ -897,6 +906,59 @@ function showTargetPicker() {
 }
 window.showTargetPicker = showTargetPicker;
 
+// Fictional names for the help modal's example links, so they never depend
+// on (or get confused with) whoever's actually in _data/billiards.yml.
+const HELP_EXAMPLE_NAMES = ['Fred', 'Barney', 'Wilma', 'Betty', 'Mr. Slate', 'Hawkeye', 'Frank', 'Potter', 'Radar'];
+
+function showHelpModal() {
+  const root = document.getElementById('modal-root');
+  const [p1, p2, p3, p4] = HELP_EXAMPLE_NAMES;
+  // Every href here is a bare query string (no scheme/host), so it always
+  // resolves relative to wherever the page is currently loaded from —
+  // works unchanged on localhost, a LAN dev server, or the prod domain.
+  const examples = [
+    [`Quick 8-Ball: ${p1} vs ${p2}`, `?game=8-ball&a=${p1}&b=${p2}`],
+    [`9-Ball with a queue`, `?game=9-ball&a=${p1}&b=${p2}&queue=${p3},${p4}`],
+    [`Straight Pool, race to 75`, `?game=straightpool&a=${p1}&b=${p2}&to=75`],
+    [`Elimination, 3 players`, `?game=elimination&a=${p1}&b=${p2}&c=${p3}`],
+    [`Just pre-fill Setup (no auto-start)`, `?a=${p1},${p2}&b=${p3}&queue=${p4}`],
+  ];
+  const rows = [
+    ['players', 'Roster shown on Setup (defaults to the YAML roster). Comma-separated.'],
+    ['a / b / c', 'Pre-fill team one / two / three (1-2 names each; c is Elimination-only).'],
+    ['queue', 'Pre-fill the Up Next queue. Ignored for Elimination.'],
+    ['game', '8-ball, 9-ball, 10-ball, straightpool, or elimination — also jumps straight to Play Mode.'],
+    ['to', 'Race-to score, Straight Pool only.'],
+  ];
+  root.innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+      <div class="modal" style="min-width:min(92vw,560px);max-width:560px;max-height:85vh;overflow-y:auto;text-align:left">
+        <p style="text-align:center;font-weight:700;font-size:1.15rem;margin-bottom:1rem">URL Shortcuts</p>
+        <p style="font-size:0.9rem;color:var(--muted);margin-bottom:1rem">
+          Add these to the page's URL to pre-fill Setup or jump straight into a game —
+          handy for bookmarking a regular matchup or linking someone right into Play Mode.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1.2rem">
+          ${rows.map(([k, desc]) => `
+            <div>
+              <code style="background:var(--surface2);padding:0.15rem 0.4rem;border-radius:5px;font-weight:700">${x(k)}</code>
+              <span style="font-size:0.85rem;color:var(--muted)"> — ${x(desc)}</span>
+            </div>`).join('')}
+        </div>
+        <div class="label" style="margin-bottom:0.4rem">Try it</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem">
+          ${examples.map(([label, qs]) => `
+            <a href="${x(qs)}" style="display:block;text-decoration:none;color:inherit;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:0.5rem 0.75rem;cursor:pointer">
+              <div style="font-weight:600;font-size:0.9rem">${x(label)}</div>
+              <div style="opacity:0.55;font-size:0.75rem;font-family:monospace;word-break:break-all">${x(qs)}</div>
+            </a>`).join('')}
+        </div>
+        <button class="btn-ghost" style="width:100%" onclick="closeModal()">Close</button>
+      </div>
+    </div>`;
+}
+window.showHelpModal = showHelpModal;
+
 function showQueueModal() {
   const root = document.getElementById('modal-root');
   const isPartner = S.teams.some(t => t.players.length > 1);
@@ -1021,7 +1083,15 @@ setInterval(() => {
   }
 }, 1000);
 
-render();
+// If ?game= was given, jump straight to Play Mode now that everything
+// above (GAME_TYPES, TEAM_COLOR_VARS, etc.) is fully initialized — D('start')
+// itself calls render(), so this replaces the plain render() below it.
+if (requestedGame) {
+  const to = new URLSearchParams(location.search).get(QP.TO);
+  D('start', to ? +to : undefined);
+} else {
+  render();
+}
 </script>
 </body>
 </html>
