@@ -680,6 +680,9 @@ function viewGame() {
       </div>
       ${S.teams.length === 2 && S.queue.length > 0
         ? `<button class="btn-primary btn-lg" onclick="D('playNext')">▶ Play Next: ${x(S.queue[0].players.join(' & '))}</button>
+           <button class="btn-primary btn-sm" style="margin-top:0.6rem" onclick="D('playAgain')">
+             ↻ Play Again: ${x(teamLabel(S.lastWinner))} vs ${x(teamLabel(S.lastWinner ^ 1))}
+           </button>
            <button class="btn-primary btn-sm" style="margin-top:0.6rem" onclick="D('deferNext')">
              ↷ Defer: ${x(teamLabel(S.lastWinner ^ 1))} vs ${x(S.queue[0].players.join(' & '))}
            </button>`
