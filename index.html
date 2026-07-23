@@ -46,21 +46,13 @@ const GAME_ALIASES = {
   'straightpool': 'straight-pool',
   'elimination': 'cutthroat',
 };
-const TEAM_A_OVERRIDE = (() => {
-  const raw = new URLSearchParams(location.search).get(QP.TEAM_A);
-  if (!raw) return [];
-  return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 2);
-})();
-const TEAM_B_OVERRIDE = (() => {
-  const raw = new URLSearchParams(location.search).get(QP.TEAM_B);
-  if (!raw) return [];
-  return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 2);
-})();
-const TEAM_C_OVERRIDE = (() => {
-  const raw = new URLSearchParams(location.search).get(QP.TEAM_C);
-  if (!raw) return [];
-  return raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, 1);
-})();
+function parseTeamParam(key, max) {
+  const raw = new URLSearchParams(location.search).get(key);
+  return raw ? raw.split(',').map(n => n.trim()).filter(Boolean).slice(0, max) : [];
+}
+const TEAM_A_OVERRIDE = parseTeamParam(QP.TEAM_A, 2);
+const TEAM_B_OVERRIDE = parseTeamParam(QP.TEAM_B, 2);
+const TEAM_C_OVERRIDE = parseTeamParam(QP.TEAM_C, 1);
 const QUEUE_OVERRIDE = (() => {
   const raw = new URLSearchParams(location.search).get(QP.QUEUE);
   if (!raw) return [];
@@ -399,6 +391,13 @@ function randomizeOrderIfNeeded() {
 function dequeuePlayers(names) {
   S.queue = S.queue.filter(e => !e.players.some(p => names.includes(p)));
 }
+// Re-initializes extras for the current game type, preserving the race-to
+// target across resets so Straight Pool players don't have to re-pick it.
+function resetExtras() {
+  const prev = S.extras.target;
+  S.extras = GAME_TYPES[S.gameType].initExtras();
+  if (prev !== undefined) S.extras.target = prev;
+}
 
 // HTML-escape for display
 function x(s) {
@@ -469,11 +468,9 @@ function D(action, a, b) {
     }
 
     case 'playAgain': {
-      const prevTarget = S.extras.target;
       const winner = S.lastWinner;
       S.lastWinner = null;
-      S.extras = GAME_TYPES[S.gameType].initExtras();
-      if (prevTarget !== undefined) S.extras.target = prevTarget;
+      resetExtras();
       if (!randomizeOrderIfNeeded()) {
         S.breakTeam = winner;
         putWinnerLeft(winner);
@@ -495,11 +492,9 @@ function D(action, a, b) {
       T[loser].players = next.players;
       T[loser].shooterIdx = 0;
       T[loser].wins = 0;
-      const prevTarget = S.extras.target;
       S.lastWinner = null;
       S.breakTeam = winner;
-      S.extras = GAME_TYPES[S.gameType].initExtras();
-      if (prevTarget !== undefined) S.extras.target = prevTarget;
+      resetExtras();
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
       putWinnerLeft(winner);
@@ -520,11 +515,9 @@ function D(action, a, b) {
       T[winner].players = next.players;
       T[winner].shooterIdx = 0;
       T[winner].wins = 0;
-      const prevTarget = S.extras.target;
       S.lastWinner = null;
       S.breakTeam = winner; // the queue challenger, now in the winner's old slot, breaks
-      S.extras = GAME_TYPES[S.gameType].initExtras();
-      if (prevTarget !== undefined) S.extras.target = prevTarget;
+      resetExtras();
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
       putWinnerLeft(loser); // the player staying at the table goes on the left
@@ -578,7 +571,7 @@ function D(action, a, b) {
     case 'coinFlip': { const b = new Uint8Array(1); crypto.getRandomValues(b); S.breakTeam = b[0] % S.teams.length; break; }
 
     case 'newGame':
-      S.extras = GAME_TYPES[S.gameType].initExtras();
+      resetExtras();
       if (!randomizeOrderIfNeeded()) S.breakTeam = null;
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
