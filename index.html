@@ -481,46 +481,29 @@ function D(action, a, b) {
       break;
     }
 
-    case 'playNext': {
-      // Queue rotation isn't designed for >2 teams yet (Cutthroat).
-      if (S.queue.length === 0 || S.teams.length !== 2) break;
-      const winner = S.lastWinner;
-      const loser = winner ^ 1;
-      const next = S.queue.shift();
-      dequeuePlayers(next.players);
-      S.queue.push({ players: [...T[loser].players] }); // outgoing player rejoins the back of the line
-      T[loser].players = next.players;
-      T[loser].shooterIdx = 0;
-      T[loser].wins = 0;
-      S.lastWinner = null;
-      S.breakTeam = winner;
-      resetExtras();
-      S.gameStartedAt = Date.now();
-      S.gameEndedAt = null;
-      putWinnerLeft(winner);
-      playMode = true;
-      break;
-    }
-
-    // Winner steps aside (still on a hot streak, but wants others to play);
-    // the loser stays at the table to face the next challenger in queue.
+    // playNext: loser leaves, winner stays and breaks.
+    // deferNext: winner steps aside, loser stays and the challenger breaks.
+    // In both cases S.breakTeam = winner (the winner's slot index, which
+    // holds the challenger after deferNext rotates them in).
+    case 'playNext':
     case 'deferNext': {
       // Queue rotation isn't designed for >2 teams yet (Cutthroat).
       if (S.queue.length === 0 || S.teams.length !== 2) break;
       const winner = S.lastWinner;
       const loser = winner ^ 1;
+      const outSlot = action === 'deferNext' ? winner : loser;
       const next = S.queue.shift();
       dequeuePlayers(next.players);
-      S.queue.push({ players: [...T[winner].players] });
-      T[winner].players = next.players;
-      T[winner].shooterIdx = 0;
-      T[winner].wins = 0;
+      S.queue.push({ players: [...T[outSlot].players] });
+      T[outSlot].players = next.players;
+      T[outSlot].shooterIdx = 0;
+      T[outSlot].wins = 0;
       S.lastWinner = null;
-      S.breakTeam = winner; // the queue challenger, now in the winner's old slot, breaks
+      S.breakTeam = winner;
       resetExtras();
       S.gameStartedAt = Date.now();
       S.gameEndedAt = null;
-      putWinnerLeft(loser); // the player staying at the table goes on the left
+      putWinnerLeft(outSlot ^ 1);
       playMode = true;
       break;
     }
@@ -660,7 +643,7 @@ function viewSetup() {
 // ── GAME VIEW ───────────────────────────────────────────────────────────────
 function viewGame() {
   const gt = GAME_TYPES[S.gameType];
-  const scorecards = buildScorecards().join('');
+  const scorecards = buildGameScorecards().join('');
 
   const gridClass = teamsGridClass();
 
@@ -783,13 +766,38 @@ const BANNER = `<div style="text-align:center;margin-bottom:1.25rem">
   <div style="height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent)"></div>
 </div>`;
 
-function buildScorecards(forPlay = false) {
+function buildPlayScorecards() {
   const gt = GAME_TYPES[S.gameType];
   const colors  = S.teams.map((_, i) => TEAM_COLOR_VARS[i]);
   const bgAlpha = S.teams.map((_, i) => teamAlpha(i, 0.15));
   // Cutthroat has no solids/stripes assignment to mark "past the break" —
   // use the first ball being hit as that same signal instead.
   const anyBallHit = S.gameType === 'cutthroat' && S.extras.hit.some(arr => arr.some(Boolean));
+  return S.teams.map((t, i) => {
+    const ballHtml = gt.playBallPicker
+      ? gt.playBallPicker(i, S.extras, colors[i])
+      : (gt.teamBadge && gt.teamBadge(i, S.extras))
+        ? `<div class="play-ball">${gt.teamBadge(i, S.extras)}</div>`
+        : `<div class="play-ball">${gt.ballHtml('score')}</div>`;
+    const playExtrasHtml = gt.playExtras ? gt.playExtras(i, S.extras, colors[i]) : '';
+    const winSlot = isEliminated(i)
+      ? `<div class="eliminated-pill">Eliminated</div>`
+      : `<button class="play-win-btn" onclick="playMode=false;D('win',${i})">🏆 Win</button>`;
+    return `
+      <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
+        <div class="sc-name">${x(teamLabel(i))}</div>
+        ${S.breakTeam === i && S.extras.solidsTeam == null && !anyBallHit ? '<div class="break-badge">Break</div>' : ''}
+        ${ballHtml}
+        ${playExtrasHtml}
+        ${winSlot}
+      </div>`;
+  });
+}
+
+function buildGameScorecards() {
+  const gt = GAME_TYPES[S.gameType];
+  const colors  = S.teams.map((_, i) => TEAM_COLOR_VARS[i]);
+  const bgAlpha = S.teams.map((_, i) => teamAlpha(i, 0.15));
   return S.teams.map((t, i) => {
     const players = t.players.length
       ? t.players.map((p, pi) => {
@@ -800,29 +808,6 @@ function buildScorecards(forPlay = false) {
           </div>`;
         }).join('')
       : '<div class="player-box bench"><div class="pb-name muted">—</div></div>';
-
-    const displayName = teamLabel(i);
-
-    if (forPlay) {
-      const ballHtml = gt.playBallPicker
-        ? gt.playBallPicker(i, S.extras, colors[i])
-        : (gt.teamBadge && gt.teamBadge(i, S.extras))
-          ? `<div class="play-ball">${gt.teamBadge(i, S.extras)}</div>`
-          : `<div class="play-ball">${gt.ballHtml('score')}</div>`;
-      const playExtrasHtml = gt.playExtras ? gt.playExtras(i, S.extras, colors[i]) : '';
-      const winSlot = isEliminated(i)
-        ? `<div class="eliminated-pill">Eliminated</div>`
-        : `<button class="play-win-btn" onclick="playMode=false;D('win',${i})">🏆 Win</button>`;
-      return `
-        <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
-          <div class="sc-name">${x(displayName)}</div>
-          ${S.breakTeam === i && S.extras.solidsTeam == null && !anyBallHit ? '<div class="break-badge">Break</div>' : ''}
-          ${ballHtml}
-          ${playExtrasHtml}
-          ${winSlot}
-        </div>`;
-    }
-
     const badge = gt.teamBadge ? gt.teamBadge(i, S.extras) : '';
     const { w: myW, l: myL } = sessionRecord(t.players);
     const tallyScore = `${myW}–${myL}`;
@@ -848,7 +833,7 @@ function buildScorecards(forPlay = false) {
     }
     return `
       <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
-        <div class="sc-name">${x(displayName)}</div>
+        <div class="sc-name">${x(teamLabel(i))}</div>
         ${badge ? `<div class="sc-wins-row">${badge}</div>` : ''}
         <div class="sc-players">${players}</div>
         ${t.players.length > 1
@@ -864,7 +849,7 @@ function render() {
   const el = document.getElementById('app');
 
   if (playMode && S.view === 'game') {
-    const cards = buildScorecards(true).join('');
+    const cards = buildPlayScorecards().join('');
     const cardsClass = S.teams.length === 3 ? 'play-cards cols-3' : 'play-cards';
     const upNextLabel = S.queue.length > 0
       ? `👥 Up Next: ${x(S.queue[0].players.join(' & '))}`
