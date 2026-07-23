@@ -346,6 +346,14 @@ img[src*="billiard-ball"] { filter: none !important; }
   color: var(--text);
   cursor: pointer; user-select: none;
 }
+.play-swap {
+  position: absolute; left: 1.5vw; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 999px; padding: 0.4em 1.1em;
+  font-size: clamp(1.2rem, 2.6vw, 1.9rem); font-weight: 700;
+  color: var(--text);
+  cursor: pointer; user-select: none;
+}
 
 
 /* ── Custom confirm dialog ───────────────────────────────────────────── */
