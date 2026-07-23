@@ -881,7 +881,7 @@ function render() {
         <button class="play-close" onclick="modal('End this game and return to setup?',()=>D('goHome'))">✕</button>
         <div class="${cardsClass}">${cards}</div>
         <div class="play-toolbar">
-          ${S.gameType === 'eight-ball' && S.extras.solidsTeam !== null ? `<div class="play-swap" onclick="D('swapSolids')">⇄</div>` : ''}
+          ${S.gameType === 'eight-ball' && S.extras.solidsTeam !== null ? `<div class="play-swap" onclick="D('swapSolids')">🔄</div>` : ''}
           ${GAME_TYPES[S.gameType].randomOrder ? '' : `<button onclick="D('coinFlip')"><img src="${ASSETS_DIR}coin.png" width="18" height="18" style="vertical-align:middle;margin-right:0.35em">Flip for break</button>`}
           <button onclick="showQueueModal()">${upNextLabel}</button>
           <button onclick="D('togglePlay')">⚙ Game Settings</button>
