@@ -517,6 +517,22 @@ function D(action, a, b) {
       S.queue.splice(a, 1);
       break;
 
+    // a = team index, b = [slotIndex, incomingName]. Swaps whoever's
+    // currently in that slot for someone from the queue, and sends the
+    // outgoing player to the back of the line. Not offered for Elimination,
+    // same as playNext/deferNext.
+    case 'swapPlayer': {
+      if (S.teams.length !== 2) break;
+      const [si, incoming] = b;
+      const outgoing = T[a].players[si];
+      dequeuePlayers([incoming]);
+      S.queue.push({ players: [outgoing] });
+      T[a].players[si] = incoming;
+      T[a].wins = 0;
+      T[a].shooterIdx = 0;
+      break;
+    }
+
     case 'swapShooter':
       if (T[a].players.length > 1) T[a].shooterIdx ^= 1;
       break;
@@ -781,9 +797,12 @@ function buildPlayScorecards() {
     const winSlot = isEliminated(i)
       ? `<div class="eliminated-pill">Eliminated</div>`
       : `<button class="play-win-btn" onclick="playMode=false;D('win',${i})">🏆 Win</button>`;
+    // Tap the name to swap this player for someone in the queue — not
+    // offered for Elimination, which doesn't support queue rotation.
+    const nameAttrs = S.teams.length === 2 ? ` onclick="showSwapModal(${i})" style="cursor:pointer"` : '';
     return `
       <div class="score-card" style="border-color:${colors[i]};background:${bgAlpha[i]}">
-        <div class="sc-name">${x(teamLabel(i))}</div>
+        <div class="sc-name"${nameAttrs}>${x(teamLabel(i))}</div>
         ${S.breakTeam === i && S.extras.solidsTeam == null && !anyBallHit ? '<div class="break-badge">Break</div>' : ''}
         ${ballHtml}
         ${playExtrasHtml}
@@ -1007,6 +1026,51 @@ function showQueueModal() {
     </div>`;
 }
 window.showQueueModal = showQueueModal;
+
+// Tapping a Play Mode card's name opens this to swap that player for
+// someone waiting in the queue. For a 2-player team, asks which of the two
+// is swapping out first; for a single player it goes straight to the list.
+function showSwapModal(teamIdx, slotIdx) {
+  const root = document.getElementById('modal-root');
+  const team = S.teams[teamIdx];
+
+  if (slotIdx === undefined && team.players.length > 1) {
+    root.innerHTML = `
+      <div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+        <div class="modal">
+          <p style="font-weight:700;font-size:1.1rem;margin-bottom:0.75rem">Who's swapping out?</p>
+          <div style="display:flex;flex-direction:column;gap:0.6rem">
+            ${team.players.map((p, si) => `
+              <button class="btn-ghost" onclick="showSwapModal(${teamIdx},${si})">${x(p)}</button>`).join('')}
+          </div>
+          <button class="btn-ghost" style="width:100%;margin-top:0.75rem" onclick="closeModal()">Cancel</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const si = slotIdx || 0;
+  const outgoing = team.players[si];
+  const candidates = S.queue.flatMap(e => e.players);
+  const candidatesHtml = candidates.length > 0
+    ? `<div class="pills" style="justify-content:center">
+        ${candidates.map(p => `
+          <button class="pill" data-name="${xa(p)}" onclick="D('swapPlayer',${teamIdx},[${si},this.dataset.name]);closeModal()">
+            ${x(p)}
+          </button>`).join('')}
+      </div>`
+    : `<p style="opacity:0.5;text-align:center;margin:0.5rem 0">No one waiting</p>`;
+
+  root.innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <p style="font-weight:700;font-size:1.1rem;margin-bottom:0.75rem">Swap out ${x(outgoing)}</p>
+        ${candidatesHtml}
+        <button class="btn-ghost" style="width:100%;margin-top:0.75rem" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>`;
+}
+window.showSwapModal = showSwapModal;
 
 function promptPlayer(ti) {
   const root = document.getElementById('modal-root');
