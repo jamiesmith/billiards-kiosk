@@ -21,8 +21,8 @@ players:
 # different numbered balls. solids/stripes mark teams in 8-Ball; the rest
 # identify each game type on the Play Mode scoreboard.
 balls:
-  solids: billiard-ball-5.png
-  stripes: billiard-ball-12.png
+  solids: billiard-ball-3.png
+  stripes: billiard-ball-13.png
   eight_ball: billiard-ball-8.png
   nine_ball: billiard-ball-9.png
   ten_ball: billiard-ball-10.png
